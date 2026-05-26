@@ -1,0 +1,79 @@
+
+=== BACKEND UPDATES SUMMARY ===
+
+COMPLETED TASKS:
+
+1. AUTH CONTROLLERS & ROUTES:
+   - Updated: src/controllers/auth.js with handlers:
+     * register()
+     * login()
+     * getProfile()
+     * updateProfile() - NEW
+     * changePassword() - NEW
+     * forgotPassword() - NEW
+     * resetPassword() - NEW
+   
+   - Updated: src/routes/auth.js with new routes:
+     * POST /forgot-password
+     * POST /reset-password
+     * PUT /profile
+     * POST /change-password
+
+2. BOOKING CONTROLLERS & ROUTES:
+   - Created: src/controllers/bookingController.js (matches frontend parameters)
+   - Updated: createBooking() accepts { tripId, items, total }
+   - Updated: exchangeBooking() accepts { toItems, note }
+   - Removed: old booking.js file
+
+3. DATABASE MODELS:
+   - Updated: src/models/User.js
+     * Added: resetPasswordToken
+     * Added: resetPasswordExpires
+   
+   - Updated: src/models/Trip.js
+     * Added: seatsAvailable field
+     * Kept: seats (total capacity)
+
+4. UTILITIES:
+   - Created: src/utils/mailer.js
+     * sendResetPasswordEmail()
+     * sendBookingConfirmation()
+
+ENDPOINTS AVAILABLE:
+
+Authentication:
+  POST /api/auth/register
+  POST /api/auth/login
+  GET /api/auth/profile
+  PUT /api/auth/profile
+  POST /api/auth/change-password
+  POST /api/auth/forgot-password
+  POST /api/auth/reset-password
+
+Bookings:
+  POST /api/bookings
+  GET /api/bookings
+  GET /api/bookings/:id
+  PUT /api/bookings/:id/status
+  POST /api/bookings/:id/cancel
+  POST /api/bookings/:id/exchange
+
+Trips:
+  GET /api/trips
+  GET /api/trips/:id
+
+Wallet:
+  GET /api/wallet
+  GET /api/wallet/history
+
+DATABASE SCHEMA UPDATES NEEDED:
+
+ALTER TABLE trips ADD COLUMN seatsAvailable INTEGER DEFAULT seats;
+ALTER TABLE users ADD COLUMN resetPasswordToken VARCHAR(255);
+ALTER TABLE users ADD COLUMN resetPasswordExpires TIMESTAMP;
+
+NEXT STEPS:
+
+1. Restart backend: npm run dev
+2. Test from frontend
+3. Check console for errors
