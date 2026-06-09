@@ -1,8 +1,10 @@
 import Trip from '../models/Trip.js';
+import Carrier from '../models/Carrier.js';
+import Booking from '../models/Booking.js';
 
 export const getTrips = async (req, res) => {
   try {
-    const { from, to, date, limit = 10, offset = 0 } = req.query;
+    const { from, to, date, timeOfDay, vehicleType, limit = 10, offset = 0 } = req.query;
 
     // Build where clause
     const where = {};
@@ -13,15 +15,24 @@ export const getTrips = async (req, res) => {
     // Query trips
     const trips = await Trip.findAll({
       where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      include: [{ model: Carrier, attributes: ['id', 'name', 'status', 'approved'] }],
       order: [['createdAt', 'DESC']]
     });
+    const filteredTrips = trips.filter((trip) => {
+      if (timeOfDay && getTimeOfDay(trip.departure) !== timeOfDay) return false;
+      if (vehicleType && getVehicleType(trip.bus) !== vehicleType) return false;
+      return true;
+    });
+
+    const start = parseInt(offset);
+    const end = start + parseInt(limit);
+    const pagedTrips = filteredTrips.slice(start, end);
 
     res.json({
       success: true,
-      data: trips,
-      count: trips.length
+      data: pagedTrips,
+      count: pagedTrips.length,
+      total: filteredTrips.length
     });
   } catch (error) {
     console.error('Error fetching trips:', error);
@@ -32,11 +43,28 @@ export const getTrips = async (req, res) => {
   }
 };
 
+const getTimeOfDay = (departure = '') => {
+  const hour = Number.parseInt(String(departure).split(':')[0], 10);
+  if (!Number.isFinite(hour)) return '';
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 18) return 'afternoon';
+  return 'night';
+};
+
+const getVehicleType = (bus = '') => {
+  const text = String(bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  if (text.includes('giuong') || text.includes('limousine') || text.includes('sleeper')) return 'sleeping';
+  if (text.includes('ghe') || text.includes('ngoi') || text.includes('seat')) return 'seating';
+  return '';
+};
+
 export const getTripById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const trip = await Trip.findByPk(id);
+    const trip = await Trip.findByPk(id, {
+      include: [{ model: Carrier, attributes: ['id', 'name', 'status', 'approved'] }],
+    });
 
     if (!trip) {
       return res.status(404).json({
@@ -71,17 +99,30 @@ export const getSeats = async (req, res) => {
       });
     }
 
-    // Generate seat map (6 rows x 4 columns = 24 seats)
-    const rows = 6;
+    const bookings = await Booking.findAll({
+      where: { tripId, cancelStatus: 'active' },
+      attributes: ['items'],
+    });
+    const occupiedSeatLabels = bookings.flatMap((booking) => {
+      const items = Array.isArray(booking.items) ? booking.items : [];
+      return items.flatMap((item) => item.selectedSeatLabels || item.selectedSeats || []);
+    }).map((label) => Number(label)).filter((label) => Number.isFinite(label));
+    const occupiedSet = new Set(occupiedSeatLabels);
+
+    // Generate seat map
     const cols = 4;
+    const rows = Math.ceil(Number(trip.seats || 0) / cols);
     const seatMap = [];
 
     for (let row = 1; row <= rows; row++) {
       for (let col = 1; col <= cols; col++) {
+        const label = (row - 1) * cols + col;
+        if (label > Number(trip.seats || 0)) continue;
         seatMap.push({
+          label,
           row,
           col,
-          available: true
+          available: !occupiedSet.has(label)
         });
       }
     }
@@ -91,13 +132,41 @@ export const getSeats = async (req, res) => {
       data: {
         tripId,
         totalSeats: trip.seats,
-        availableSeats: trip.seats,
-        occupiedSeats: 0,
+        availableSeats: trip.seatsAvailable,
+        occupiedSeats: occupiedSet.size,
+        occupiedSeatLabels: Array.from(occupiedSet),
         seatMap
       }
     });
   } catch (error) {
     console.error('Error fetching seats:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getLocations = async (req, res) => {
+  try {
+    // Get all unique departure and destination locations
+    const trips = await Trip.findAll({
+      attributes: ['from', 'to'],
+      raw: true
+    });
+
+    const locations = new Set();
+    trips.forEach(trip => {
+      if (trip.from) locations.add(trip.from);
+      if (trip.to) locations.add(trip.to);
+    });
+
+    res.json({
+      success: true,
+      data: Array.from(locations).sort()
+    });
+  } catch (error) {
+    console.error('Error fetching locations:', error);
     res.status(500).json({
       success: false,
       error: error.message

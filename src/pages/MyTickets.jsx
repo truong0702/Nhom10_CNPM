@@ -9,7 +9,6 @@ import {
 import { walletApi } from '../services/walletApi'
 import ExchangeTicketModal from '../components/ExchangeTicketModal'
 
-
 export default function MyTickets() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -23,10 +22,11 @@ export default function MyTickets() {
   const refresh = async () => {
     setError('')
     if (!user) return
+
     try {
       setBookings(await getBookingsByUser(user.id))
       const wallet = await walletApi.getBalance()
-      setWalletBalance(wallet?.balance ?? wallet ?? 0)
+      setWalletBalance(Number(wallet?.balance ?? wallet ?? 0))
     } catch (e) {
       setError(e.message)
     }
@@ -43,15 +43,11 @@ export default function MyTickets() {
   }, [user, navigate])
 
   const grouped = useMemo(() => {
-    const paid = bookings.filter((b) => b.paymentStatus === 'paid')
-    const others = bookings.filter((b) => b.paymentStatus !== 'paid')
-    return { paid, others }
+    const verified = bookings.filter((b) => b.payment?.status === 'verified' || b.paymentStatus === 'paid')
+    const pending = bookings.filter((b) => b.payment?.status === 'pending')
+    const failed = bookings.filter((b) => b.payment?.status === 'failed' || (b.paymentStatus === 'failed' && !b.payment))
+    return { verified, pending, failed }
   }, [bookings])
-
-  const canInteract = (booking) => {
-    // Chỉ cho hủy/đổi nếu đã thanh toán và booking chưa hủy
-    return booking.paymentStatus === 'paid' && booking.cancelStatus !== 'canceled'
-  }
 
   const exchangingBooking = useMemo(
     () => bookings.find((b) => b.id === exchangingBookingId),
@@ -60,56 +56,57 @@ export default function MyTickets() {
 
   if (!user) return null
 
+  const canInteract = (booking) => {
+    const isPaid = booking.payment?.status === 'verified' || booking.paymentStatus === 'paid'
+    const isNotCanceled = booking.cancelStatus !== 'canceled'
+    return isPaid && isNotCanceled
+  }
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-black text-gray-900">Vé của tôi</h1>
-        <p className="text-sm text-slate-500 mt-1">Xem các vé bạn đã đặt và trạng thái thanh toán</p>
+        <p className="mt-1 text-sm text-slate-500">Xem các vé bạn đã đặt và trạng thái thanh toán</p>
       </div>
 
-      {/* Wallet Balance */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+      <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
         <div className="text-sm text-blue-700">Số dư ví</div>
-        <div className="text-2xl font-black text-blue-900 mt-1">
-          {walletBalance.toLocaleString('vi-VN')}đ
-        </div>
+        <div className="mt-1 text-2xl font-black text-blue-900">{formatCurrency(walletBalance)}</div>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 font-semibold">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700">
           {error}
         </div>
       )}
 
       {!bookings.length ? (
-        <div className="border rounded-2xl bg-white p-8 shadow-sm text-sm text-slate-600">
+        <div className="rounded-2xl border bg-white p-8 text-sm text-slate-600 shadow-sm">
           Bạn chưa có vé nào. Hãy đặt chuyến trước khi xem vé.
         </div>
       ) : (
         <div className="space-y-6">
-          <Section title={`Đã thanh toán (${grouped.paid.length})`}>
-            {grouped.paid.length ? (
-              grouped.paid.map((b) => (
+          <Section title={`Đã xác nhận (${grouped.verified.length})`}>
+            {grouped.verified.length ? (
+              grouped.verified.map((booking) => (
                 <TicketCard
-                  key={b.id}
-                  booking={b}
-                  canInteract={canInteract(b)}
-                  busy={busyBookingId === b.id}
+                  key={booking.id}
+                  booking={booking}
+                  canInteract={canInteract(booking)}
+                  busy={busyBookingId === booking.id}
                   onCancel={async ({ reason }) => {
-                    setBusyBookingId(b.id)
+                    setBusyBookingId(booking.id)
                     setError('')
                     try {
-                      await cancelBooking(b.id, reason)
-                      refresh()
+                      await cancelBooking(booking.id, reason)
+                      await refresh()
                     } catch (e) {
                       setError(e.message)
                     } finally {
                       setBusyBookingId(null)
                     }
                   }}
-                  onExchange={() => {
-                    setExchangingBookingId(b.id)
-                  }}
+                  onExchange={() => setExchangingBookingId(booking.id)}
                 />
               ))
             ) : (
@@ -117,14 +114,31 @@ export default function MyTickets() {
             )}
           </Section>
 
-          <Section title={`Chưa thanh toán / Thất bại (${grouped.others.length})`}>
-            {grouped.others.length ? (
-              grouped.others.map((b) => (
+          <Section title={`Chờ xác nhận thanh toán (${grouped.pending.length})`}>
+            {grouped.pending.length ? (
+              grouped.pending.map((booking) => (
                 <TicketCard
-                  key={b.id}
-                  booking={b}
-                  canInteract={canInteract(b)}
-                  busy={busyBookingId === b.id}
+                  key={booking.id}
+                  booking={booking}
+                  canInteract={false}
+                  busy={false}
+                  onCancel={async () => {}}
+                  onExchange={() => {}}
+                />
+              ))
+            ) : (
+              <Empty />
+            )}
+          </Section>
+
+          <Section title={`Thanh toán thất bại (${grouped.failed.length})`}>
+            {grouped.failed.length ? (
+              grouped.failed.map((booking) => (
+                <TicketCard
+                  key={booking.id}
+                  booking={booking}
+                  canInteract={false}
+                  busy={false}
                   onCancel={async () => {}}
                   onExchange={() => {}}
                 />
@@ -136,7 +150,6 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* Exchange Modal */}
       {exchangingBooking && (
         <ExchangeTicketModal
           booking={exchangingBooking}
@@ -146,8 +159,8 @@ export default function MyTickets() {
             setBusyBookingId(exchangingBooking.id)
             setError('')
             try {
-              await exchangeBooking(exchangingBooking.id, { toItems, note })
-              refresh()
+              await exchangeBooking(exchangingBooking.id, toItems, note)
+              await refresh()
               setExchangingBookingId(null)
             } catch (e) {
               setError(e.message)
@@ -158,7 +171,6 @@ export default function MyTickets() {
         />
       )}
 
-      {/* convenience */}
       <div className="mt-8 text-xs text-slate-400">
         Phí hủy vé: 10%, phí đổi vé: 5%
       </div>
@@ -166,11 +178,10 @@ export default function MyTickets() {
   )
 }
 
-
 function Section({ title, children }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border p-5">
-      <div className="font-black text-gray-900 mb-4">{title}</div>
+    <div className="rounded-2xl border bg-white p-5 shadow-sm">
+      <div className="mb-4 font-black text-gray-900">{title}</div>
       <div className="space-y-3">{children}</div>
     </div>
   )
@@ -178,59 +189,65 @@ function Section({ title, children }) {
 
 function Empty() {
   return (
-    <div className="text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-4">
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
       Trống
     </div>
   )
 }
 
 function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
-  const statusLabel =
-    booking.paymentStatus === 'paid'
-      ? { text: 'Đã thanh toán', cls: 'bg-green-50 text-green-700 border-green-200' }
-      : booking.paymentStatus === 'processing'
-        ? { text: 'Đang xử lý', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
-        : { text: 'Chưa thanh toán / Thất bại', cls: 'bg-red-50 text-red-700 border-red-200' }
-
   const [expanded, setExpanded] = useState(false)
   const [localCancelReason, setLocalCancelReason] = useState(booking.cancelReason || 'Không hài lòng với chuyến đi')
 
-  // Tính phí hủy
-  const cancelFee = Math.round(booking.total * 0.1)
-  const cancelRefund = booking.total - cancelFee
-  const exchangeFee = Math.round(booking.total * 0.05)
-
   const isCanceled = booking.cancelStatus === 'canceled'
+  const statusLabel = getStatusLabel(booking)
+  const cancelFee = Math.round(Number(booking.total || 0) * 0.1)
+  const cancelRefund = Number(booking.total || 0) - cancelFee
+  const exchangeFee = Math.round(Number(booking.total || 0) * 0.05)
 
   return (
-    <div className={`border rounded-xl p-4 ${isCanceled ? 'bg-red-50' : 'bg-slate-50'}`}>
+    <div className={`rounded-xl border p-4 ${isCanceled ? 'bg-red-50' : 'bg-slate-50'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-bold text-gray-900">Mã vé: #{booking.id}</div>
-          <div className="text-xs text-slate-500 mt-1">
-            {new Date(booking.createdAt).toLocaleString('vi-VN')}
-          </div>
+          <div className="mt-1 text-xs text-slate-500">{formatDateTime(booking.createdAt)}</div>
           {isCanceled && (
-            <div className="text-xs text-red-600 font-semibold mt-2">
-              Vé đã hủy lúc {new Date(booking.canceledAt).toLocaleString('vi-VN')}
+            <div className="mt-2 text-xs font-semibold text-red-600">
+              Vé đã hủy lúc {formatDateTime(booking.canceledAt)}
             </div>
           )}
-          <div className="text-sm font-semibold text-gray-900 mt-3">
-            Tổng: {Number(booking.total).toLocaleString('vi-VN')}đ
+          <div className="mt-3 text-sm font-semibold text-gray-900">
+            Tổng: {formatCurrency(booking.total)}
           </div>
         </div>
 
-        <div className={`text-xs font-bold px-3 py-1 rounded-full border ${statusLabel.cls}`}>
+        <div className={`rounded-full border px-3 py-1 text-xs font-bold ${statusLabel.cls}`}>
           {statusLabel.text}
         </div>
       </div>
 
+      {booking.payment?.status === 'pending' && (
+        <Notice tone="amber" title="Chờ xác nhận thanh toán">
+          Thanh toán của bạn đã được ghi nhận. Admin sẽ xác nhận trong vòng 24h.
+          Bạn sẽ không thể hủy/đổi vé cho tới khi thanh toán được xác nhận.
+          {booking.payment?.createdAt && (
+            <div className="mt-2">Thời gian thanh toán: {formatDateTime(booking.payment.createdAt)}</div>
+          )}
+        </Notice>
+      )}
+
+      {booking.payment?.status === 'failed' && (
+        <Notice tone="red" title="Thanh toán thất bại">
+          Thanh toán của bạn đã bị từ chối. Vui lòng liên hệ admin hoặc thử lại.
+        </Notice>
+      )}
+
       <div className="mt-3 space-y-2">
-        {(booking.items || []).map((it, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-3 text-sm">
-            <div className="text-slate-700">{it.title}</div>
-            <div className="text-slate-900 font-semibold">
-              {Number(it.price).toLocaleString('vi-VN')}đ x {it.qty}
+        {(booking.items || []).map((item, index) => (
+          <div key={index} className="flex items-center justify-between gap-3 text-sm">
+            <div className="text-slate-700">{item.title || item.description || item.tripId || 'Chuyến xe'}</div>
+            <div className="font-semibold text-slate-900">
+              {formatCurrency(item.price)} x {item.qty || item.seats || 1}
             </div>
           </div>
         ))}
@@ -238,81 +255,63 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
 
       {(canInteract || expanded) && !isCanceled && (
         <div className="mt-4">
+          {!canInteract && booking.payment?.status === 'pending' && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+              Vui lòng chờ admin xác nhận thanh toán trước khi hủy/đổi vé.
+            </div>
+          )}
+
           <button
-            className="text-sm font-semibold text-indigo-700 hover:text-indigo-800"
-            onClick={() => setExpanded((v) => !v)}
+            className={`text-sm font-semibold ${canInteract ? 'text-indigo-700 hover:text-indigo-800' : 'cursor-not-allowed text-gray-400'}`}
+            onClick={() => setExpanded((value) => !value)}
             type="button"
+            disabled={!canInteract}
           >
             {expanded ? 'Thu gọn' : 'Hủy / Đổi vé'}
           </button>
 
           {expanded && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Hủy vé */}
-              <div className="bg-white border border-red-200 rounded-xl p-4">
-                <div className="font-black text-gray-900 text-sm mb-3">Hủy vé</div>
-                
-                {/* Chi phí hủy */}
-                <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-3 text-xs space-y-1">
-                  <div className="flex justify-between text-slate-700">
-                    <span>Giá vé:</span>
-                    <span className="font-semibold">{Number(booking.total).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div className="flex justify-between text-red-700 font-semibold">
-                    <span>Phí hủy (10%):</span>
-                    <span>-{cancelFee.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div className="border-t border-red-200 pt-1 flex justify-between text-green-700 font-bold">
-                    <span>Hoàn lại:</span>
-                    <span>{cancelRefund.toLocaleString('vi-VN')}đ</span>
-                  </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-red-200 bg-white p-4">
+                <div className="mb-3 text-sm font-black text-gray-900">Hủy vé</div>
+                <div className="mb-3 space-y-1 rounded-lg border border-red-100 bg-red-50 p-3 text-xs">
+                  <PriceRow label="Giá vé" value={booking.total} />
+                  <PriceRow label="Phí hủy (10%)" value={-cancelFee} tone="red" />
+                  <PriceRow label="Hoàn lại" value={cancelRefund} tone="green" strong />
                 </div>
-
                 <input
                   placeholder="Lý do hủy vé..."
                   value={localCancelReason}
                   onChange={(e) => setLocalCancelReason(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:outline-none focus:border-red-500 text-sm mb-3"
+                  className="mb-3 w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   disabled={!canInteract || busy}
                 />
                 <button
                   disabled={!canInteract || busy}
                   onClick={() => onCancel({ reason: localCancelReason })}
-                  className={
-                    'w-full px-4 py-2 rounded-lg text-white text-sm font-bold transition shadow ' +
-                    (!canInteract || busy ? 'bg-red-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700')
-                  }
+                  className={`w-full rounded-lg px-4 py-2 text-sm font-bold text-white shadow transition ${
+                    !canInteract || busy ? 'cursor-not-allowed bg-red-300' : 'bg-red-600 hover:bg-red-700'
+                  }`}
                 >
                   {busy ? 'Đang xử lý...' : 'Xác nhận hủy vé'}
                 </button>
               </div>
 
-              {/* Đổi vé */}
-              <div className="bg-white border border-indigo-200 rounded-xl p-4">
-                <div className="font-black text-gray-900 text-sm mb-3">Đổi vé</div>
-                
-                {/* Chi phí đổi */}
-                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-3 text-xs space-y-1">
-                  <div className="flex justify-between text-slate-700">
-                    <span>Giá vé hiện tại:</span>
-                    <span className="font-semibold">{Number(booking.total).toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div className="flex justify-between text-indigo-700 font-semibold">
-                    <span>Phí đổi vé (5%):</span>
-                    <span>-{exchangeFee.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                  <div className="border-t border-indigo-200 pt-1 text-xs text-slate-600">
-                    <p>Chọn vé mới rồi nhập ghi chú để xác nhận đổi</p>
+              <div className="rounded-xl border border-indigo-200 bg-white p-4">
+                <div className="mb-3 text-sm font-black text-gray-900">Đổi vé</div>
+                <div className="mb-3 space-y-1 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs">
+                  <PriceRow label="Giá vé hiện tại" value={booking.total} />
+                  <PriceRow label="Phí đổi vé (5%)" value={-exchangeFee} tone="indigo" />
+                  <div className="border-t border-indigo-200 pt-1 text-slate-600">
+                    Chọn vé mới rồi nhập ghi chú để xác nhận đổi.
                   </div>
                 </div>
-
                 <button
                   disabled={!canInteract || busy}
-                  onClick={() => onExchange()}
-                  className={
-                    'w-full px-4 py-2 rounded-lg text-white text-sm font-bold transition shadow ' +
-                    (!canInteract || busy ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700')
-                  }
+                  onClick={onExchange}
+                  className={`w-full rounded-lg px-4 py-2 text-sm font-bold text-white shadow transition ${
+                    !canInteract || busy ? 'cursor-not-allowed bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
                   {busy ? 'Đang xử lý...' : 'Mở form đổi vé'}
                 </button>
@@ -323,21 +322,20 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
       )}
 
       {isCanceled && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
-          <div className="text-xs font-semibold text-red-700 mb-2">Lý do hủy:</div>
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+          <div className="mb-2 text-xs font-semibold text-red-700">Lý do hủy:</div>
           <div className="text-sm text-red-700">{booking.cancelReason || 'Không có ghi chú'}</div>
         </div>
       )}
 
-      {/* Lịch sử đổi vé */}
-      {booking.exchanges && booking.exchanges.length > 0 && (
-        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="text-xs font-semibold text-blue-700 mb-2">Lịch sử đổi vé:</div>
-          {booking.exchanges.map((ex, idx) => (
-            <div key={idx} className="text-xs text-blue-700 mb-2">
-              <div>Lần {idx + 1}: {new Date(ex.at).toLocaleString('vi-VN')}</div>
+      {booking.exchanges?.length > 0 && (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <div className="mb-2 text-xs font-semibold text-blue-700">Lịch sử đổi vé:</div>
+          {booking.exchanges.map((exchange, index) => (
+            <div key={index} className="mb-2 text-xs text-blue-700">
+              <div>Lần {index + 1}: {formatDateTime(exchange.timestamp || exchange.at)}</div>
               <div className="ml-2 text-blue-600">
-                {ex.note} (Phí: {ex.exchangeFee?.toLocaleString('vi-VN') || '0'}đ)
+                {exchange.reason || exchange.note || describeExchange(exchange)} (Phí: {formatCurrency(exchange.exchangeFee || 0)})
               </div>
             </div>
           ))}
@@ -345,4 +343,71 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
       )}
     </div>
   )
+}
+
+function Notice({ tone, title, children }) {
+  const cls = tone === 'red'
+    ? 'border-red-200 bg-red-50 text-red-700'
+    : 'border-amber-200 bg-amber-50 text-amber-700'
+
+  return (
+    <div className={`mt-3 rounded-lg border p-3 text-xs ${cls}`}>
+      <div className="font-semibold">{title}</div>
+      <div className="mt-1">{children}</div>
+    </div>
+  )
+}
+
+function PriceRow({ label, value, tone = 'default', strong = false }) {
+  const color =
+    tone === 'red' ? 'text-red-700' :
+    tone === 'green' ? 'text-green-700' :
+    tone === 'indigo' ? 'text-indigo-700' :
+    'text-slate-700'
+
+  return (
+    <div className={`flex justify-between ${color} ${strong ? 'border-t border-red-200 pt-1 font-bold' : 'font-semibold'}`}>
+      <span>{label}:</span>
+      <span>{formatCurrency(value)}</span>
+    </div>
+  )
+}
+
+function getStatusLabel(booking) {
+  if (booking.payment) {
+    if (booking.payment.status === 'verified') {
+      return { text: 'Đã thanh toán', cls: 'border-green-200 bg-green-50 text-green-700' }
+    }
+    if (booking.payment.status === 'pending') {
+      return { text: 'Chờ xác nhận thanh toán', cls: 'border-amber-200 bg-amber-50 text-amber-700' }
+    }
+    if (booking.payment.status === 'failed') {
+      return { text: 'Thanh toán thất bại', cls: 'border-red-200 bg-red-50 text-red-700' }
+    }
+  }
+
+  if (booking.paymentStatus === 'paid') {
+    return { text: 'Đã thanh toán', cls: 'border-green-200 bg-green-50 text-green-700' }
+  }
+  if (booking.paymentStatus === 'processing' || booking.paymentStatus === 'pending') {
+    return { text: 'Đang xử lý', cls: 'border-amber-200 bg-amber-50 text-amber-700' }
+  }
+  return { text: 'Chưa thanh toán', cls: 'border-red-200 bg-red-50 text-red-700' }
+}
+
+function formatCurrency(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
+}
+
+function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('vi-VN')
+}
+
+function describeExchange(exchange = {}) {
+  const fromRoute = exchange.from?.route
+  const toRoute = exchange.to?.route
+  if (fromRoute && toRoute) return `${fromRoute} → ${toRoute}`
+  return 'Đổi vé'
 }

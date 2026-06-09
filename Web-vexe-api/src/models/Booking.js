@@ -35,6 +35,10 @@ const Booking = sequelize.define(
       type: DataTypes.BIGINT,
       allowNull: false,
     },
+    paymentMethod: {
+      type: DataTypes.ENUM('bank_transfer', 'wallet', 'cash_at_station'),
+      defaultValue: 'bank_transfer',
+    },
     paymentStatus: {
       type: DataTypes.ENUM('pending', 'paid', 'failed'),
       defaultValue: 'pending',

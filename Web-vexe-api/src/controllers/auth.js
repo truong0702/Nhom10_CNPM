@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { User, Wallet } from '../models/index.js';
+import { Carrier, User, Wallet } from '../models/index.js';
 import { sendResetPasswordEmail } from '../utils/mailer.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
@@ -78,10 +78,92 @@ export const register = async (req, res) => {
   }
 };
 
+// Register carrier account
+export const registerCarrier = async (req, res) => {
+  try {
+    const {
+      email,
+      password,
+      fullName,
+      phone = '',
+      carrierName,
+      carrierPhone = '',
+      carrierAddress = '',
+    } = req.body;
+
+    if (!email || !password || !fullName || !carrierName) {
+      return res.status(400).json({
+        error: 'Email, password, fullName, and carrierName are required',
+      });
+    }
+
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists' });
+    }
+
+    const existingCarrier = await Carrier.findOne({ where: { email } });
+    if (existingCarrier) {
+      return res.status(409).json({ error: 'Carrier email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      email,
+      password: hashedPassword,
+      fullName,
+      phone,
+      role: 'carrier',
+      isVerified: false,
+    });
+
+    const carrier = await Carrier.create({
+      name: carrierName,
+      email,
+      phone: carrierPhone || phone || null,
+      address: carrierAddress || null,
+      ownerUserId: user.id,
+      approved: false,
+      status: 'inactive',
+      rating: 4.5,
+      reviews: 0,
+    });
+
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: TOKEN_EXPIRY }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      JWT_REFRESH_SECRET,
+      { expiresIn: REFRESH_TOKEN_EXPIRY }
+    );
+
+    return res.status(201).json({
+      message: 'Carrier registered successfully. Please wait for admin approval.',
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        phone: user.phone,
+        role: user.role,
+        carrier,
+      },
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.error('Register carrier error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Login user
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, loginAs } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -98,6 +180,18 @@ export const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    if (loginAs === 'carrier' && user.role !== 'carrier') {
+      return res.status(403).json({ error: 'This account is not a carrier account' });
+    }
+
+    if (loginAs === 'user' && user.role === 'carrier') {
+      return res.status(403).json({ error: 'Please use the carrier login tab for this account' });
+    }
+
+    const carrier = user.role === 'carrier'
+      ? await Carrier.findOne({ where: { ownerUserId: user.id } })
+      : null;
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -120,6 +214,7 @@ export const login = async (req, res) => {
         fullName: user.fullName,
         phone: user.phone,
         role: user.role,
+        carrier,
       },
       accessToken,
       refreshToken,
@@ -144,11 +239,15 @@ export const getProfile = async (req, res) => {
     }
 
     const wallet = await Wallet.findOne({ where: { userId } });
+    const carrier = user.role === 'carrier'
+      ? await Carrier.findOne({ where: { ownerUserId: user.id } })
+      : null;
 
     return res.json({
       user: {
         ...user.toJSON(),
         wallet: wallet ? { balance: wallet.balance, currency: wallet.currency } : null,
+        carrier,
       },
     });
   } catch (error) {
@@ -161,7 +260,7 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { fullName, phone, avatar } = req.body;
+    const { fullName, email, phone, avatar } = req.body;
 
     const user = await User.findByPk(userId);
     if (!user) {
@@ -170,6 +269,13 @@ export const updateProfile = async (req, res) => {
 
     // Update fields
     if (fullName) user.fullName = fullName;
+    if (email && email !== user.email) {
+      const existing = await User.findOne({ where: { email } });
+      if (existing && existing.id !== user.id) {
+        return res.status(409).json({ error: 'Email already exists' });
+      }
+      user.email = email;
+    }
     if (phone) user.phone = phone;
     if (avatar) user.avatar = avatar;
 
@@ -267,6 +373,7 @@ export const forgotPassword = async (req, res) => {
 
     return res.json({
       message: 'If an account exists with this email, a reset link will be sent',
+      ...(process.env.NODE_ENV !== 'production' && { token: resetToken }),
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -323,6 +430,7 @@ export const resetPassword = async (req, res) => {
 
 export default {
   register,
+  registerCarrier,
   login,
   getProfile,
   updateProfile,

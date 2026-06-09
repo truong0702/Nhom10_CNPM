@@ -49,12 +49,12 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, loginAs = 'user') => {
     try {
       setError(null);
       setLoading(true);
 
-      const response = await authApi.login(email, password);
+      const response = await authApi.login(email, password, loginAs);
       setUser(response?.user || response?.data || response || null);
 
       return response;
@@ -79,6 +79,45 @@ export function AuthProvider({ children }) {
 
   const isAdmin = () => user?.role === 'admin';
 
+  const updateProfile = async (payload) => {
+    const response = await authApi.updateProfile(payload);
+    const nextUser = response?.user || response?.data || response || null;
+    if (nextUser) {
+      setUser((prev) => ({ ...(prev || {}), ...nextUser }));
+    }
+    return response;
+  };
+
+  const registerCarrier = async (payload) => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      const response = await authApi.registerCarrier(payload);
+      setUser(response?.user || response?.data || response || null);
+
+      return response;
+    } catch (err) {
+      const errorMessage = err.message || 'Carrier registration failed';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changePassword = async ({ currentPassword, oldPassword, newPassword }) => {
+    return authApi.changePassword(oldPassword || currentPassword, newPassword);
+  };
+
+  const requestPasswordReset = async (email) => {
+    return authApi.forgotPassword(email);
+  };
+
+  const resetPassword = async (token, newPassword) => {
+    return authApi.resetPassword(token, newPassword);
+  };
+
   const adminGetAllUsers = async () => {
     const response = await adminApi.getUsers();
     return response.users || [];
@@ -99,8 +138,13 @@ export function AuthProvider({ children }) {
     loading,
     error,
     register,
+    registerCarrier,
     login,
     logout,
+    updateProfile,
+    changePassword,
+    requestPasswordReset,
+    resetPassword,
     isAdmin,
     adminGetAllUsers,
     adminUpdateUser,
@@ -127,8 +171,13 @@ export function useAuth() {
       loading: true,
       error: null,
       register: async () => { throw new Error('Auth not available') },
+      registerCarrier: async () => { throw new Error('Auth not available') },
       login: async () => { throw new Error('Auth not available') },
       logout: () => {},
+      updateProfile: async () => { throw new Error('Auth not available') },
+      changePassword: async () => { throw new Error('Auth not available') },
+      requestPasswordReset: async () => { throw new Error('Auth not available') },
+      resetPassword: async () => { throw new Error('Auth not available') },
       isAdmin: () => false,
       adminGetAllUsers: async () => [],
       adminUpdateUser: async () => null,

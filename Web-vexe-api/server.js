@@ -8,6 +8,8 @@ import bookingRoutes from './src/routes/booking.js';
 import tripRoutes from './src/routes/trip.js';
 import walletRoutes from './src/routes/wallet.js';
 import adminRoutes from './src/routes/admin.js';
+import paymentRoutes from './src/routes/payment.js';
+import carrierRoutes from './src/routes/carrier.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { Carrier, Trip, User, Wallet } from './src/models/index.js';
 
@@ -55,6 +57,8 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/carrier', carrierRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -89,6 +93,35 @@ const seedDemoData = async () => {
   if (!carrier) {
     throw new Error('Unable to seed carrier');
   }
+
+  const carrierPasswordHash = await bcrypt.hash('123456', 10);
+  const [carrierUser, carrierUserCreated] = await User.findOrCreate({
+    where: { email: 'carrier@vexe.local' },
+    defaults: {
+      email: 'carrier@vexe.local',
+      password: carrierPasswordHash,
+      fullName: 'Vexe Express',
+      phone: '0900000000',
+      role: 'carrier',
+      isVerified: true,
+    },
+  });
+
+  if (!carrierUserCreated) {
+    await carrierUser.update({
+      password: carrierPasswordHash,
+      fullName: 'Vexe Express',
+      phone: '0900000000',
+      role: 'carrier',
+      isVerified: true,
+    });
+  }
+
+  await carrier.update({
+    ownerUserId: carrierUser.id,
+    approved: true,
+    status: 'active',
+  });
 
   const tripSeeds = [
     { from: 'Hà Nội', to: 'Đà Nẵng', departure: '07:00', arrival: '15:30', duration: '8h 30m', date: today, bus: 'Limousine 24 chỗ', seats: 20, seatsAvailable: 18, price: 450000, rating: 4.8, reviews: 64, image: '/images/trips/hanoi-danang.jpg' },
@@ -206,11 +239,37 @@ const startServer = async () => {
       console.log(`  POST   /api/auth/register`);
       console.log(`  POST   /api/auth/login`);
       console.log(`  GET    /api/auth/profile`);
+      console.log(`  PUT    /api/auth/profile`);
+      console.log(`  POST   /api/auth/change-password`);
+      console.log(`  POST   /api/auth/forgot-password`);
+      console.log(`  POST   /api/auth/reset-password`);
       console.log(`  POST   /api/bookings`);
       console.log(`  GET    /api/bookings`);
       console.log(`  GET    /api/bookings/:bookingId`);
       console.log(`  POST   /api/bookings/:bookingId/cancel`);
       console.log(`  POST   /api/bookings/:bookingId/exchange`);
+      console.log(`  PUT    /api/bookings/:bookingId/status`);
+      console.log(`  GET    /api/trips`);
+      console.log(`  GET    /api/trips/locations`);
+      console.log(`  GET    /api/trips/:id`);
+      console.log(`  GET    /api/trips/:id/seats`);
+      console.log(`  GET    /api/payments/bank-info`);
+      console.log(`  POST   /api/payments/bank-transfer`);
+      console.log(`  GET    /api/payments/:paymentId`);
+      console.log(`  GET    /api/payments/admin/pending`);
+      console.log(`  GET    /api/payments/admin/all`);
+      console.log(`  POST   /api/payments/admin/:paymentId/verify`);
+      console.log(`  POST   /api/payments/admin/:paymentId/reject`);
+      console.log(`  GET    /api/carrier/me`);
+      console.log(`  GET    /api/carrier/trips`);
+      console.log(`  POST   /api/carrier/trips`);
+      console.log(`  GET    /api/carrier/bookings`);
+      console.log(`  GET    /api/admin/trips`);
+      console.log(`  POST   /api/admin/trips`);
+      console.log(`  PUT    /api/admin/trips/:id`);
+      console.log(`  DELETE /api/admin/trips/:id`);
+      console.log(`  GET    /api/wallet`);
+      console.log(`  GET    /api/health`);
     });
   } catch (error) {
     console.error('✗ Failed to start server:', error.message);

@@ -1,4 +1,4 @@
-import { Booking, Trip, User, Wallet } from '../models/index.js';
+import { Booking, Trip, User, Wallet, Payment } from '../models/index.js';
 
 // Helper functions
 const getWalletBalance = async (userId) => {
@@ -11,7 +11,7 @@ const getWalletBalance = async (userId) => {
 
 const addWalletCredit = async (userId, amount, description = {}) => {
   const wallet = await getWalletBalance(userId);
-  wallet.balance += amount;
+  wallet.balance = Number(wallet.balance || 0) + Number(amount || 0);
   if (!wallet.history) wallet.history = [];
   wallet.history.push({
     type: description.type || 'OTHER',
@@ -27,7 +27,7 @@ const addWalletCredit = async (userId, amount, description = {}) => {
 // CREATE BOOKING - Accept items and total from frontend
 export const createBooking = async (req, res) => {
   try {
-    const { tripId, items, total } = req.body;
+    const { tripId, items, total, paymentMethod } = req.body;
     const userId = req.user.id;
 
     // Validate trip exists
@@ -53,6 +53,32 @@ export const createBooking = async (req, res) => {
       });
     }
 
+    const requestedSeatLabels = (Array.isArray(items) ? items : [])
+      .flatMap((item) => item.selectedSeatLabels || item.selectedSeats || [])
+      .map((label) => Number(label))
+      .filter((label) => Number.isFinite(label));
+
+    if (requestedSeatLabels.length) {
+      const existingBookings = await Booking.findAll({
+        where: { tripId, cancelStatus: 'active' },
+        attributes: ['items'],
+      });
+      const occupiedSeatLabels = existingBookings
+        .flatMap((booking) => (Array.isArray(booking.items) ? booking.items : []))
+        .flatMap((item) => item.selectedSeatLabels || item.selectedSeats || [])
+        .map((label) => Number(label))
+        .filter((label) => Number.isFinite(label));
+      const occupiedSet = new Set(occupiedSeatLabels);
+      const duplicatedSeats = requestedSeatLabels.filter((label) => occupiedSet.has(label));
+
+      if (duplicatedSeats.length) {
+        return res.status(400).json({
+          error: 'Some selected seats are no longer available',
+          seats: Array.from(new Set(duplicatedSeats)),
+        });
+      }
+    }
+
     // Prepare items
     const bookingItems = Array.isArray(items) ? items : [
       {
@@ -63,12 +89,16 @@ export const createBooking = async (req, res) => {
       }
     ];
 
+    // Convert total to number
+    const totalAmount = Number(total) || Number(trip.price * totalSeats);
+
     // Create booking
     const booking = await Booking.create({
       userId,
       tripId,
       items: bookingItems,
-      total: total || trip.price * totalSeats,
+      total: totalAmount,
+      paymentMethod: paymentMethod || 'bank_transfer',
       paymentStatus: 'pending',
       cancelStatus: 'active',
     });
@@ -106,25 +136,28 @@ export const exchangeBooking = async (req, res) => {
   try {
     const { id } = req.params;
     const { toItems, note } = req.body;
-    const userId = req.user.id;
+    const requesterId = req.user.id;
 
     // Get current booking
     const booking = await Booking.findByPk(id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
     // Verify ownership
-    if (booking.userId !== userId) {
+    if (booking.userId !== requesterId && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized: Cannot exchange this booking' });
     }
+    const walletUserId = booking.userId;
 
     // Check if already canceled
     if (booking.cancelStatus === 'canceled') {
       return res.status(400).json({ error: 'Cannot exchange a canceled booking' });
     }
 
-    // Extract new trip info from toItems
-    const newTripId = toItems?.tripId;
-    const exchangeSeats = toItems?.seats || booking.items[0]?.seats || 1;
+    const nextItem = Array.isArray(toItems) ? toItems[0] : toItems;
+    const oldTripId = booking.tripId;
+    const oldSeats = Number(booking.items?.[0]?.seats || booking.items?.[0]?.qty || 1);
+    const newTripId = nextItem?.tripId || nextItem?.id;
+    const exchangeSeats = Number(nextItem?.seats || nextItem?.selectedSeatLabels?.length || nextItem?.qty || oldSeats || 1);
 
     if (!newTripId) {
       return res.status(400).json({ error: 'New trip ID is required (toItems.tripId)' });
@@ -147,14 +180,10 @@ export const exchangeBooking = async (req, res) => {
 
     // Calculate price difference
     const oldTotal = booking.total;
-    const newTotal = newTrip.price * exchangeSeats;
+    const newTotal = Number(nextItem?.total || Number(newTrip.price) * exchangeSeats);
     const priceDifference = newTotal - oldTotal;
 
-    // Calculate exchange fee (5%)
-    let exchangeFee = 0;
-    if (priceDifference > 0) {
-      exchangeFee = Math.ceil(priceDifference * 0.05);
-    }
+    const exchangeFee = Math.ceil(Number(oldTotal) * 0.05);
 
     // Track exchange in history
     if (!booking.exchanges) booking.exchanges = [];
@@ -162,7 +191,7 @@ export const exchangeBooking = async (req, res) => {
       from: {
         tripId: oldTrip?.id,
         route: `${oldTrip?.from} -> ${oldTrip?.to}`,
-        seats: booking.items[0]?.seats,
+        seats: oldSeats,
       },
       to: {
         tripId: newTripId,
@@ -179,7 +208,7 @@ export const exchangeBooking = async (req, res) => {
 
     // Update booking
     booking.tripId = newTripId;
-    booking.items = [
+    booking.items = Array.isArray(toItems) && toItems.length ? toItems : [
       {
         description: `${newTrip.from} -> ${newTrip.to}`,
         seats: exchangeSeats,
@@ -192,7 +221,7 @@ export const exchangeBooking = async (req, res) => {
     if (!booking.history) booking.history = [];
     booking.history.push({
       event: 'BOOKING_EXCHANGED',
-      oldTrip: booking.tripId,
+      oldTrip: oldTripId,
       newTrip: newTripId,
       priceDifference,
       exchangeFee,
@@ -203,7 +232,7 @@ export const exchangeBooking = async (req, res) => {
 
     // Update seat counts
     if (oldTrip) {
-      oldTrip.seatsAvailable += booking.items[0]?.seats || 0;
+      oldTrip.seatsAvailable += oldSeats;
       await oldTrip.save();
     }
     newTrip.seatsAvailable -= exchangeSeats;
@@ -211,7 +240,7 @@ export const exchangeBooking = async (req, res) => {
 
     // Update wallet for fees
     if (exchangeFee > 0) {
-      await addWalletCredit(userId, -exchangeFee, {
+      await addWalletCredit(walletUserId, -exchangeFee, {
         type: 'EXCHANGE_FEE',
         description: 'Exchange fee',
         bookingId: id,
@@ -219,20 +248,20 @@ export const exchangeBooking = async (req, res) => {
     }
 
     if (priceDifference > 0) {
-      await addWalletCredit(userId, -priceDifference, {
+      await addWalletCredit(walletUserId, -priceDifference, {
         type: 'EXCHANGE_ADDITIONAL_CHARGE',
         description: 'Additional charge for exchange',
         bookingId: id,
       });
     } else if (priceDifference < 0) {
-      await addWalletCredit(userId, Math.abs(priceDifference), {
+      await addWalletCredit(walletUserId, Math.abs(priceDifference), {
         type: 'EXCHANGE_REFUND',
         description: 'Refund from exchange',
         bookingId: id,
       });
     }
 
-    const updatedWallet = await getWalletBalance(userId);
+    const updatedWallet = await getWalletBalance(walletUserId);
 
     return res.json({
       message: 'Booking exchanged successfully',
@@ -257,14 +286,15 @@ export const cancelBooking = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const userId = req.user.id;
+    const requesterId = req.user.id;
 
     const booking = await Booking.findByPk(id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    if (booking.userId !== userId) {
+    if (booking.userId !== requesterId && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
+    const walletUserId = booking.userId;
 
     if (booking.cancelStatus === 'canceled') {
       return res.status(400).json({ error: 'Booking already canceled' });
@@ -275,10 +305,15 @@ export const cancelBooking = async (req, res) => {
     booking.canceledAt = new Date();
     booking.cancelReason = reason || 'No reason provided';
 
+    const cancelFee = Math.round(Number(booking.total) * 0.1);
+    const refundAmount = Number(booking.total) - cancelFee;
+
     if (!booking.history) booking.history = [];
     booking.history.push({
       event: 'BOOKING_CANCELED',
       reason: reason,
+      cancelFee,
+      refundAmount,
       timestamp: new Date(),
     });
 
@@ -291,19 +326,18 @@ export const cancelBooking = async (req, res) => {
       await trip.save();
     }
 
-    // Refund to wallet
-    const refundAmount = booking.total;
-    await addWalletCredit(userId, refundAmount, {
+    await addWalletCredit(walletUserId, refundAmount, {
       type: 'BOOKING_CANCELLATION_REFUND',
       description: 'Refund for canceled booking',
       bookingId: id,
     });
 
-    const updatedWallet = await getWalletBalance(userId);
+    const updatedWallet = await getWalletBalance(walletUserId);
 
     return res.json({
       message: 'Booking canceled successfully',
       booking,
+      cancelFee,
       refund: refundAmount,
       wallet: {
         newBalance: updatedWallet.balance,
@@ -319,8 +353,39 @@ export const cancelBooking = async (req, res) => {
 export const getBookings = async (req, res) => {
   try {
     const userId = req.user.id;
-    const bookings = await Booking.findAll({ where: { userId } });
-    return res.json({ bookings });
+    const bookings = await Booking.findAll({
+      where: { userId },
+      include: [
+        {
+          model: Trip,
+          attributes: ['from', 'to', 'departure', 'arrival', 'bus', 'date'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+
+    // Get payment status for each booking
+    const bookingsWithPayment = await Promise.all(
+      bookings.map(async (booking) => {
+        const payment = await Payment.findOne({
+          where: { bookingId: booking.id },
+          order: [['createdAt', 'DESC']],
+        });
+        return {
+          ...booking.toJSON(),
+          payment: payment ? {
+            id: payment.id,
+            status: payment.status,
+            amount: payment.amount,
+            method: payment.paymentMethod,
+            createdAt: payment.createdAt,
+            verifiedAt: payment.verifiedAt,
+          } : null,
+        };
+      })
+    );
+
+    return res.json({ bookings: bookingsWithPayment });
   } catch (error) {
     console.error('Get bookings error:', error);
     res.status(500).json({ error: error.message });
@@ -340,7 +405,25 @@ export const getBooking = async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    return res.json({ booking });
+    // Get payment info
+    const payment = await Payment.findOne({
+      where: { bookingId: id },
+      order: [['createdAt', 'DESC']],
+    });
+
+    return res.json({
+      booking: {
+        ...booking.toJSON(),
+        payment: payment ? {
+          id: payment.id,
+          status: payment.status,
+          amount: payment.amount,
+          method: payment.paymentMethod,
+          createdAt: payment.createdAt,
+          verifiedAt: payment.verifiedAt,
+        } : null,
+      },
+    });
   } catch (error) {
     console.error('Get booking error:', error);
     res.status(500).json({ error: error.message });
@@ -352,6 +435,7 @@ export const updateBookingPaymentStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const requesterId = req.user.id;
 
     if (!['pending', 'paid', 'failed'].includes(status)) {
       return res.status(400).json({ error: 'Invalid payment status' });
@@ -359,6 +443,10 @@ export const updateBookingPaymentStatus = async (req, res) => {
 
     const booking = await Booking.findByPk(id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    if (booking.userId !== requesterId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
 
     booking.paymentStatus = status;
 

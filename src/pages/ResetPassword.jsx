@@ -14,7 +14,7 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const { resetPassword } = useAuth()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setMessage('')
@@ -28,7 +28,7 @@ export default function ResetPassword() {
       if (newPassword !== confirmPassword) throw new Error('Mật khẩu không trùng khớp')
 
       // 🔥 FIX #1: Thêm .trim() để xóa khoảng trắng
-      const res = resetPassword(token.trim(), newPassword)
+      const res = await resetPassword(token.trim(), newPassword)
       setMessage(res.message)
 
       // 🔥 FIX #2: Hiện thông báo và navigate ngay thay vì setTimeout

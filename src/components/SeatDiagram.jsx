@@ -91,14 +91,14 @@ export default function SeatDiagram({
     const titleText = status === 'locked' ? `Cho ${seatNum} da duoc chon` : `Cho ${seatNum}`
 
     return (
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex min-w-[54px] flex-col items-center gap-1">
         <button
           type="button"
           onClick={() => handleSeatClick(seatNum)}
           disabled={isDisabled}
           data-testid={`seat-${seatNum}`}
           className={
-            'w-10 h-10 rounded-lg border-2 font-bold text-xs transition ' +
+            'w-10 h-9 rounded-lg border-2 font-bold text-xs transition ' +
             (status === 'selected'
               ? 'bg-blue-500 border-blue-600 text-white'
               : status === 'locked'
@@ -111,11 +111,11 @@ export default function SeatDiagram({
         >
           {seatNum}
         </button>
-        <div className="text-xs font-semibold text-slate-700">
+        <div className="text-[11px] leading-none font-semibold text-slate-700 whitespace-nowrap">
           {price.toLocaleString('vi-VN')}d
         </div>
         {(isVip || isPremium) && (
-          <div className="text-xs text-orange-600 font-bold">
+          <div className="text-[10px] leading-none text-orange-600 font-bold">
             {isPremium ? 'PREMIUM' : 'VIP'}
           </div>
         )}
@@ -140,54 +140,84 @@ export default function SeatDiagram({
         </div>
       </div>
 
-      <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-6">
+      <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-[28px] p-4 overflow-x-auto">
         {vehicleType === 'sleeping' ? (
-          <div className="space-y-3">
-            <div className="text-xs font-semibold text-slate-600 text-center mb-4">
-              Tang tren
-            </div>
-            {getSeatLayout.slice(0, Math.ceil(totalSeats / 4)).map((rowSeats, idx) => (
-              <div key={`top-${idx}`} className="flex justify-center gap-4">
-                {rowSeats.map((seatNum) => (
-                  <SeatButton key={seatNum} seatNum={seatNum} />
-                ))}
+          <div className="min-w-max">
+            <div className="flex rounded-[32px] border border-slate-300 bg-white shadow-inner overflow-hidden">
+              <div className="w-28 shrink-0 bg-slate-200 border-r border-slate-300 flex flex-col items-center justify-center gap-3 px-3">
+                <div className="w-16 h-12 rounded-l-full rounded-r-xl bg-slate-700/80 border-4 border-white shadow"></div>
+                <div className="w-10 h-10 rounded-full border-4 border-slate-500 bg-white"></div>
+                <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Dau xe</div>
               </div>
-            ))}
 
-            <div className="my-6 border-t-2 border-dashed border-slate-300"></div>
-
-            <div className="text-xs font-semibold text-slate-600 text-center mb-4">
-              Tang duoi
-            </div>
-            {getSeatLayout.slice(Math.ceil(totalSeats / 4)).map((rowSeats, idx) => (
-              <div key={`bottom-${idx}`} className="flex justify-center gap-4">
-                {rowSeats.map((seatNum) => (
-                  <SeatButton key={seatNum} seatNum={seatNum} />
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="text-xs font-semibold text-slate-600 text-center mb-4">
-              So do cho ngoi
-            </div>
-
-            <div className="flex flex-row items-start gap-3 overflow-x-auto pb-2 justify-center">
-              {getSeatLayout.map((rowSeats, idx) => (
-                <div key={`row-${idx}`} className="flex flex-col justify-start items-center gap-2">
-                  <div className="text-xs font-semibold text-slate-500 whitespace-nowrap">Hang {idx + 1}</div>
-                  <div className="flex flex-col gap-3">
-                    {rowSeats.left.map((seatNum) => (
-                      <SeatButton key={seatNum} seatNum={seatNum} />
-                    ))}
-                    <div className="h-2"></div>
-                    {rowSeats.right.map((seatNum) => (
-                      <SeatButton key={seatNum} seatNum={seatNum} />
+              <div className="p-4 space-y-5">
+                <div>
+                  <div className="text-xs font-bold text-slate-600 mb-2 text-center">Tang tren</div>
+                  <div className="flex gap-3">
+                    {getSeatLayout.slice(0, Math.ceil(totalSeats / 4)).map((rowSeats, idx) => (
+                      <div key={`top-${idx}`} className="flex flex-col gap-3 rounded-xl bg-slate-100 px-2 py-3">
+                        {rowSeats.map((seatNum) => (
+                          <SeatButton key={seatNum} seatNum={seatNum} />
+                        ))}
+                      </div>
                     ))}
                   </div>
                 </div>
-              ))}
+
+                <div className="h-8 rounded-full border border-dashed border-slate-300 bg-white flex items-center justify-center text-[11px] font-bold text-slate-500">
+                  Loi di doc xe
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold text-slate-600 mb-2 text-center">Tang duoi</div>
+                  <div className="flex gap-3">
+                    {getSeatLayout.slice(Math.ceil(totalSeats / 4)).map((rowSeats, idx) => (
+                      <div key={`bottom-${idx}`} className="flex flex-col gap-3 rounded-xl bg-slate-100 px-2 py-3">
+                        {rowSeats.map((seatNum) => (
+                          <SeatButton key={seatNum} seatNum={seatNum} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="min-w-max">
+            <div className="flex rounded-[32px] border border-slate-300 bg-white shadow-inner overflow-hidden">
+              <div className="w-28 shrink-0 bg-slate-200 border-r border-slate-300 flex flex-col items-center justify-center gap-3 px-3">
+                <div className="w-16 h-12 rounded-l-full rounded-r-xl bg-slate-700/80 border-4 border-white shadow"></div>
+                <div className="w-10 h-10 rounded-full border-4 border-slate-500 bg-white"></div>
+                <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Dau xe</div>
+              </div>
+
+              <div className="p-4">
+                <div className="text-xs font-bold text-slate-600 mb-3 text-center">So do ghe theo chieu dai xe</div>
+                <div className="flex items-stretch gap-3">
+                  {getSeatLayout.map((rowSeats, idx) => (
+                    <div key={`row-${idx}`} className="flex flex-col justify-between gap-3 rounded-xl bg-slate-100 px-2 py-3">
+                      <div className="text-[10px] font-bold text-slate-500 text-center whitespace-nowrap">Day {idx + 1}</div>
+                      <div className="flex flex-col gap-2">
+                        {rowSeats.left.map((seatNum) => (
+                          <SeatButton key={seatNum} seatNum={seatNum} />
+                        ))}
+                      </div>
+                      <div className="h-8 rounded-full border border-dashed border-slate-300 bg-white flex items-center justify-center text-[10px] font-bold text-slate-400">
+                        Loi di
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {rowSeats.right.map((seatNum) => (
+                          <SeatButton key={seatNum} seatNum={seatNum} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="w-12 rounded-r-[28px] border border-slate-200 bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 [writing-mode:vertical-rl]">
+                    Duoi xe
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -9,6 +9,7 @@ export default function SelectSeat() {
   const location = useLocation()
 
   const [trip, setTrip] = useState(null)
+  const [occupiedSeatLabels, setOccupiedSeatLabels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -19,8 +20,12 @@ export default function SelectSeat() {
     const fetchTrip = async () => {
       try {
         setLoading(true)
-        const response = await apiClient.get(`/trips/${tripId}`)
-        setTrip(response.data)
+        const [tripResponse, seatResponse] = await Promise.all([
+          apiClient.get(`/trips/${tripId}`),
+          apiClient.get(`/trips/${tripId}/seats`),
+        ])
+        setTrip(tripResponse.data)
+        setOccupiedSeatLabels(seatResponse.data?.occupiedSeatLabels || [])
         setError('')
       } catch (err) {
         setError(err.message || 'Failed to fetch trip')
@@ -43,11 +48,12 @@ export default function SelectSeat() {
       const raw = localStorage.getItem(selectionKey)
       const map = raw ? JSON.parse(raw) : {}
       const labels = map[String(tripId)]?.selectedSeatLabels
-      return Array.isArray(labels) ? labels : []
+      const localLabels = Array.isArray(labels) ? labels : []
+      return Array.from(new Set([...localLabels, ...occupiedSeatLabels].map((label) => Number(label))))
     } catch {
-      return []
+      return occupiedSeatLabels.map((label) => Number(label))
     }
-  }, [selectionKey, tripId])
+  }, [occupiedSeatLabels, selectionKey, tripId])
 
   const [selectedSeatLabels, setSelectedSeatLabels] = useState([])
 
@@ -83,7 +89,7 @@ export default function SelectSeat() {
   const seatLabelsText = useMemo(() => selectedSeatLabels.map((x) => String(x)).join(', '), [selectedSeatLabels])
 
   const toggle = (label) => {
-    if (lockedLabels.includes(label)) return
+    if (lockedLabels.includes(Number(label))) return
 
     setSelectedSeatLabels((prev) => {
       const exists = prev.includes(label)
@@ -142,7 +148,7 @@ export default function SelectSeat() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
+    <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="border rounded-2xl bg-white p-4 shadow-sm">
         <div className="text-sm text-slate-500">Step 3</div>
         <h2 className="text-2xl font-bold">Chọn chỗ {seatKind}</h2>

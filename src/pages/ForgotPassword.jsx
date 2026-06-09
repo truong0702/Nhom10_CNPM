@@ -24,7 +24,7 @@ export default function ForgotPassword() {
       if (!email) throw new Error('Vui lòng nhập email')
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Email không hợp lệ')
 
-      const res = requestPasswordReset(email)
+      const res = await requestPasswordReset(email)
       setMessage(res.message)
 
       // Cho phép sao chép mã đặt lại để tiếp tục

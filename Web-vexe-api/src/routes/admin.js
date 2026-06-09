@@ -10,6 +10,10 @@ import {
   setCarrierStatus,
   deleteCarrier,
   getBookings,
+  getTrips,
+  createTrip,
+  updateTrip,
+  deleteTrip,
 } from '../controllers/admin.js';
 import { authenticateToken, authorize } from '../middleware/auth.js';
 
@@ -28,6 +32,11 @@ router.put('/carriers/:id', updateCarrier);
 router.patch('/carriers/:id/approve', approveCarrier);
 router.patch('/carriers/:id/status', setCarrierStatus);
 router.delete('/carriers/:id', deleteCarrier);
+
+router.get('/trips', getTrips);
+router.post('/trips', createTrip);
+router.put('/trips/:id', updateTrip);
+router.delete('/trips/:id', deleteTrip);
 
 router.get('/bookings', getBookings);
 

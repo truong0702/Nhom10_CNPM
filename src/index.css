@@ -184,6 +184,59 @@
   }
 }
 
+@keyframes route-bus-drive {
+  0% {
+    left: 12%;
+  }
+  50% {
+    left: calc(88% - 5rem);
+  }
+  100% {
+    left: 12%;
+  }
+}
+
+@keyframes road-light-pulse {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+}
+
+.route-bus {
+  animation: route-bus-drive 7s ease-in-out infinite;
+}
+
+.road-light {
+  position: absolute;
+  top: 50%;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: -0.325rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.85);
+  animation: road-light-pulse 2.2s ease-in-out infinite;
+}
+
+.road-light-1 {
+  left: 32%;
+}
+
+.road-light-2 {
+  left: 52%;
+  animation-delay: 0.35s;
+}
+
+.road-light-3 {
+  left: 72%;
+  animation-delay: 0.7s;
+}
+
 .skeleton {
   animation: shimmer 2s infinite;
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);

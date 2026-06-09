@@ -37,6 +37,22 @@ export const adminApi = {
     return await apiClient.delete(`/admin/carriers/${id}`);
   },
 
+  async getTrips() {
+    return await apiClient.get('/admin/trips');
+  },
+
+  async createTrip(payload) {
+    return await apiClient.post('/admin/trips', payload);
+  },
+
+  async updateTrip(id, payload) {
+    return await apiClient.put(`/admin/trips/${id}`, payload);
+  },
+
+  async deleteTrip(id) {
+    return await apiClient.delete(`/admin/trips/${id}`);
+  },
+
   async getBookings() {
     return await apiClient.get('/admin/bookings');
   },

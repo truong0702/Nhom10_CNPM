@@ -1,65 +1,66 @@
-import { FaFacebook, FaInstagram, FaTwitter, FaPhone, FaEnvelope } from 'react-icons/fa'
+import { Link } from 'react-router-dom'
+import { FaBus, FaEnvelope, FaFacebook, FaInstagram, FaPhone, FaTwitter } from 'react-icons/fa'
+
+const aboutLinks = [
+  { label: 'Giới thiệu', to: '/about' },
+  { label: 'Tuyển dụng', to: '/careers' },
+  { label: 'Blog', to: '/blog' },
+]
+
+const supportLinks = [
+  { label: 'Liên hệ', to: '/contact' },
+  { label: 'Câu hỏi thường gặp', to: '/faq' },
+  { label: 'Chính sách', to: '/policy' },
+]
+
+const appLinks = [
+  { label: 'iOS', to: '/policy' },
+  { label: 'Android', to: '/policy' },
+  { label: 'Web', to: '/' },
+]
 
 export default function Footer() {
   return (
-    <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white mt-32 relative">
-      <div className="absolute top-0 right-0 w-96 h-96 bg-red-500 opacity-5 rounded-full -mr-48 -mt-48"></div>
+    <footer className="relative overflow-hidden bg-slate-950 text-white">
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-black" />
+      <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+      <div className="absolute -right-32 top-10 h-80 w-80 rounded-full bg-red-500/8 blur-3xl" />
 
-      <div className="max-w-7xl mx-auto px-4 py-16 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-          {/* Company Info */}
-          <div>
-            <h4 className="font-black text-2xl mb-4 text-white">Vexere</h4>
-            <p className="text-gray-400 text-sm mb-6">
-              Nền tảng đặt vé xe bus trực tuyến hàng đầu Việt Nam
+      <div className="relative mx-auto max-w-7xl px-4 py-12">
+        <div className="mb-10 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 md:grid-cols-4 lg:gap-12">
+          <div className="min-w-0">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-600 text-white shadow-lg shadow-red-950/30">
+                <FaBus className="text-2xl" />
+              </div>
+              <div>
+                <div className="text-2xl font-black">Vexere</div>
+                <div className="text-xs font-semibold text-slate-400">Đặt vé xe online</div>
+              </div>
+            </div>
+            <p className="text-sm font-semibold leading-6 text-slate-300">
+              Nền tảng đặt vé xe trực tuyến giúp khách hàng tìm chuyến, chọn ghế và theo dõi vé rõ ràng hơn.
             </p>
-            <div className="flex gap-4">
-              <SocialIcon icon={<FaFacebook />} />
-              <SocialIcon icon={<FaInstagram />} />
-              <SocialIcon icon={<FaTwitter />} />
+
+            <div className="mt-5 flex gap-3">
+              <SocialIcon label="Facebook" icon={<FaFacebook />} />
+              <SocialIcon label="Instagram" icon={<FaInstagram />} />
+              <SocialIcon label="Twitter" icon={<FaTwitter />} />
             </div>
           </div>
 
-          {/* Links */}
-          {[
-            { title: 'Về Vexere', links: ['Giới thiệu', 'Tuyển dụng', 'Blog'] },
-            { title: 'Hỗ trợ', links: ['Liên hệ', 'FAQ', 'Chính sách'] },
-            { title: 'Tải app', links: ['iOS', 'Android', 'Web'] }
-          ].map((col, idx) => (
-            <div key={idx}>
-              <h5 className="font-black text-white mb-4">{col.title}</h5>
-              <ul className="space-y-3">
-                {col.links.map((link, i) => (
-                  <li key={i}>
-                    <a href="#" className="text-gray-400 hover:text-red-500 transition font-semibold">
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <FooterColumn title="Về Vexere" links={aboutLinks} />
+          <FooterColumn title="Hỗ trợ" links={supportLinks} />
+          <FooterColumn title="Tải app" links={appLinks} />
         </div>
 
-        <div className="border-t border-gray-700 pt-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <FaPhone className="text-red-500 text-lg" />
-              <div>
-                <p className="text-xs text-gray-400">Hotline</p>
-                <p className="font-bold">1900 1000</p>
-              </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-center">
+            <ContactItem icon={<FaPhone />} label="Hotline" value="1900 1000" />
+            <ContactItem icon={<FaEnvelope />} label="Email" value="nqtruong7722@gmail.com" />
+            <div className="text-sm font-semibold leading-6 text-slate-300 md:text-right">
+              © 2026 Vexere. Mọi quyền được bảo lưu.
             </div>
-            <div className="flex items-center gap-3">
-              <FaEnvelope className="text-red-500 text-lg" />
-              <div>
-                <p className="text-xs text-gray-400">Email</p>
-                <p className="font-bold">support@vexere.com</p>
-              </div>
-            </div>
-          </div>
-          <div className="text-center text-gray-500 text-sm border-t border-gray-700 pt-6">
-            <p>&copy; 2024 Vexere - Đặt vé xe online. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -67,9 +68,44 @@ export default function Footer() {
   )
 }
 
-function SocialIcon({ icon }) {
+function FooterColumn({ title, links }) {
   return (
-    <button className="w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all hover:scale-110">
+    <div className="min-w-0">
+      <h5 className="mb-4 text-base font-black text-white">{title}</h5>
+      <ul className="space-y-3">
+        {links.map((link) => (
+          <li key={link.label}>
+            <Link to={link.to} className="text-sm font-semibold text-slate-400 hover:text-white">
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ContactItem({ icon, label, value }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-200">
+        {icon}
+      </div>
+      <div>
+        <div className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</div>
+        <div className="text-sm font-black text-white">{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function SocialIcon({ icon, label }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-red-600"
+    >
       {icon}
     </button>
   )

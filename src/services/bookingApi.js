@@ -5,11 +5,12 @@ export const bookingApi = {
   /**
    * Create new booking
    */
-  async createBooking(tripId, items, total) {
+  async createBooking(tripId, items, total, paymentMethod) {
     return await apiClient.post('/bookings', {
       tripId,
       items,
       total,
+      paymentMethod,
     });
   },
 

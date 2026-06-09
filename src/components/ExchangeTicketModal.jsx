@@ -25,12 +25,36 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
   const [selectedTripId, setSelectedTripId] = useState(null)
   const [vehicleType, setVehicleType] = useState('seating')
   const [selectedSeats, setSelectedSeats] = useState([])
+  const [occupiedSeatLabels, setOccupiedSeatLabels] = useState([])
   const [exchangeNote, setExchangeNote] = useState('Đổi vé')
 
   const selectedTrip = useMemo(
     () => trips.find((t) => String(t.id) === String(selectedTripId)),
     [trips, selectedTripId]
   )
+
+  useEffect(() => {
+    let active = true
+
+    const loadSeats = async () => {
+      if (!selectedTripId) {
+        setOccupiedSeatLabels([])
+        return
+      }
+
+      try {
+        const response = await apiClient.get(`/trips/${selectedTripId}/seats`)
+        if (active) setOccupiedSeatLabels(response.data?.occupiedSeatLabels || [])
+      } catch {
+        if (active) setOccupiedSeatLabels([])
+      }
+    }
+
+    loadSeats()
+    return () => {
+      active = false
+    }
+  }, [selectedTripId])
 
   // Tạo layout ghế (giống SeatDiagram)
   const seatLayout = useMemo(() => {
@@ -73,6 +97,8 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
   }, [selectedTrip, vehicleType])
 
   const toggleSeat = (seatNum) => {
+    if (occupiedSeatLabels.map(Number).includes(Number(seatNum))) return
+
     setSelectedSeats((prev) => {
       if (prev.includes(seatNum)) {
         return prev.filter((s) => s !== seatNum)
@@ -91,19 +117,32 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
     const toItems = [
       {
         id: selectedTrip.id,
+        tripId: selectedTrip.id,
         title: selectedTrip.bus,
         price: selectedTrip.price,
         qty: 1,
+        seats: selectedSeats.length,
         vehicleType,
         vehicleVariant: selectedTrip.bus,
         seatType: vehicleType === 'sleeping' ? 'sleeping' : 'seating',
         selectedSeatLabels: selectedSeats,
+        total: Number(selectedTrip.price) * selectedSeats.length,
       },
     ]
     onConfirm({ toItems, note: exchangeNote })
   }
 
   const exchangeFee = Math.round(booking.total * 0.05)
+
+  const getSeatClass = (seatNum) => {
+    if (occupiedSeatLabels.map(Number).includes(Number(seatNum))) {
+      return 'bg-gray-300 border-gray-400 text-gray-500 cursor-not-allowed'
+    }
+    if (selectedSeats.includes(seatNum)) {
+      return 'bg-indigo-500 border-indigo-600 text-white'
+    }
+    return 'bg-white border-green-300 hover:bg-green-50'
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -208,12 +247,11 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
                             <button
                               key={seatNum}
                               type="button"
+                              disabled={occupiedSeatLabels.map(Number).includes(Number(seatNum))}
                               onClick={() => toggleSeat(seatNum)}
                               className={
                                 'w-10 h-10 rounded-lg border-2 font-bold text-xs transition ' +
-                                (selectedSeats.includes(seatNum)
-                                  ? 'bg-indigo-500 border-indigo-600 text-white'
-                                  : 'bg-white border-green-300 hover:bg-green-50')
+                                getSeatClass(seatNum)
                               }
                             >
                               {seatNum}
@@ -231,12 +269,11 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
                             <button
                               key={seatNum}
                               type="button"
+                              disabled={occupiedSeatLabels.map(Number).includes(Number(seatNum))}
                               onClick={() => toggleSeat(seatNum)}
                               className={
                                 'w-10 h-10 rounded-lg border-2 font-bold text-xs transition ' +
-                                (selectedSeats.includes(seatNum)
-                                  ? 'bg-indigo-500 border-indigo-600 text-white'
-                                  : 'bg-white border-green-300 hover:bg-green-50')
+                                getSeatClass(seatNum)
                               }
                             >
                               {seatNum}
@@ -254,12 +291,11 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
                               <button
                                 key={seatNum}
                                 type="button"
+                                disabled={occupiedSeatLabels.map(Number).includes(Number(seatNum))}
                                 onClick={() => toggleSeat(seatNum)}
                                 className={
                                   'w-8 h-8 rounded border-2 font-bold text-xs transition ' +
-                                  (selectedSeats.includes(seatNum)
-                                    ? 'bg-indigo-500 border-indigo-600 text-white'
-                                    : 'bg-white border-green-300 hover:bg-green-50')
+                                  getSeatClass(seatNum)
                                 }
                               >
                                 {seatNum}
@@ -274,12 +310,11 @@ export default function ExchangeTicketModal({ booking, onConfirm, onCancel, load
                               <button
                                 key={seatNum}
                                 type="button"
+                                disabled={occupiedSeatLabels.map(Number).includes(Number(seatNum))}
                                 onClick={() => toggleSeat(seatNum)}
                                 className={
                                   'w-8 h-8 rounded border-2 font-bold text-xs transition ' +
-                                  (selectedSeats.includes(seatNum)
-                                    ? 'bg-indigo-500 border-indigo-600 text-white'
-                                    : 'bg-white border-green-300 hover:bg-green-50')
+                                  getSeatClass(seatNum)
                                 }
                               >
                                 {seatNum}

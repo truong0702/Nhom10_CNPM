@@ -85,7 +85,17 @@ export const deleteUser = async (req, res) => {
 
 export const getCarriers = async (req, res) => {
   try {
-    const carriers = await Carrier.findAll({ order: [['createdAt', 'DESC']] });
+    const carriers = await Carrier.findAll({
+      include: [
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'email', 'fullName', 'phone', 'role', 'isVerified'],
+          required: false,
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
     return res.json({ carriers });
   } catch (error) {
     console.error('Failed to get carriers:', error);
@@ -124,7 +134,16 @@ export const updateCarrier = async (req, res) => {
 
     const { name, email, phone, address, approved, status, rating, reviews } = req.body;
     if (name !== undefined) carrier.name = name;
-    if (email !== undefined) carrier.email = email;
+    if (email !== undefined) {
+      const normalizedEmail = email?.trim() || null;
+      if (normalizedEmail) {
+        const existingCarrier = await Carrier.findOne({ where: { email: normalizedEmail } });
+        if (existingCarrier && existingCarrier.id !== carrier.id) {
+          return res.status(409).json({ error: 'Carrier email already exists' });
+        }
+      }
+      carrier.email = normalizedEmail;
+    }
     if (phone !== undefined) carrier.phone = phone;
     if (address !== undefined) carrier.address = address;
     if (approved !== undefined) carrier.approved = Boolean(approved);
@@ -133,6 +152,19 @@ export const updateCarrier = async (req, res) => {
     if (reviews !== undefined) carrier.reviews = reviews;
 
     await carrier.save();
+
+    if (carrier.ownerUserId) {
+      const owner = await User.findByPk(carrier.ownerUserId);
+      if (owner) {
+        if (email !== undefined && carrier.email && owner.email !== carrier.email) {
+          const existingUser = await User.findOne({ where: { email: carrier.email } });
+          if (!existingUser || existingUser.id === owner.id) owner.email = carrier.email;
+        }
+        if (phone !== undefined) owner.phone = phone;
+        await owner.save();
+      }
+    }
+
     return res.json({ message: 'Carrier updated successfully', carrier });
   } catch (error) {
     console.error('Failed to update carrier:', error);
@@ -149,6 +181,14 @@ export const approveCarrier = async (req, res) => {
     carrier.approved = true;
     carrier.status = 'active';
     await carrier.save();
+
+    if (carrier.ownerUserId) {
+      const owner = await User.findByPk(carrier.ownerUserId);
+      if (owner) {
+        owner.isVerified = true;
+        await owner.save();
+      }
+    }
 
     return res.json({ message: 'Carrier approved successfully', carrier });
   } catch (error) {
@@ -184,6 +224,116 @@ export const deleteCarrier = async (req, res) => {
     return res.json({ message: 'Carrier deleted successfully' });
   } catch (error) {
     console.error('Failed to delete carrier:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+const normalizeTripPayload = (payload = {}, existingTrip = null) => {
+  const seats = payload.seats !== undefined ? Number(payload.seats) : existingTrip?.seats;
+  const seatsAvailable =
+    payload.seatsAvailable !== undefined
+      ? Number(payload.seatsAvailable)
+      : existingTrip
+        ? Math.min(Number(existingTrip.seatsAvailable), Number(seats || existingTrip.seats))
+        : Number(seats);
+
+  return {
+    carrierId: payload.carrierId,
+    from: payload.from?.trim(),
+    to: payload.to?.trim(),
+    departure: payload.departure,
+    arrival: payload.arrival,
+    duration: payload.duration || null,
+    date: payload.date,
+    bus: payload.bus?.trim(),
+    seats,
+    seatsAvailable,
+    price: payload.price !== undefined ? Number(payload.price) : existingTrip?.price,
+    rating: payload.rating !== undefined && payload.rating !== '' ? Number(payload.rating) : existingTrip?.rating ?? 4.5,
+    reviews: payload.reviews !== undefined && payload.reviews !== '' ? Number(payload.reviews) : existingTrip?.reviews ?? 0,
+    image: payload.image || null,
+  };
+};
+
+const validateTripPayload = (payload) => {
+  const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'bus'];
+  for (const field of required) {
+    if (!payload[field]) return `${field} is required`;
+  }
+  if (!Number.isFinite(payload.seats) || payload.seats <= 0) return 'seats must be greater than 0';
+  if (!Number.isFinite(payload.seatsAvailable) || payload.seatsAvailable < 0) return 'seatsAvailable must be 0 or greater';
+  if (payload.seatsAvailable > payload.seats) return 'seatsAvailable cannot exceed seats';
+  if (!Number.isFinite(payload.price) || payload.price <= 0) return 'price must be greater than 0';
+  return null;
+};
+
+export const getTrips = async (req, res) => {
+  try {
+    const trips = await Trip.findAll({
+      include: [{ model: Carrier, attributes: ['id', 'name', 'status', 'approved'] }],
+      order: [['date', 'DESC'], ['departure', 'ASC']],
+    });
+
+    return res.json({ trips });
+  } catch (error) {
+    console.error('Failed to get trips:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const createTrip = async (req, res) => {
+  try {
+    const payload = normalizeTripPayload(req.body);
+    const validationError = validateTripPayload(payload);
+    if (validationError) return res.status(400).json({ error: validationError });
+
+    const carrier = await Carrier.findByPk(payload.carrierId);
+    if (!carrier) return res.status(404).json({ error: 'Carrier not found' });
+
+    const trip = await Trip.create(payload);
+    return res.status(201).json({ message: 'Trip created successfully', trip });
+  } catch (error) {
+    console.error('Failed to create trip:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateTrip = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    const payload = normalizeTripPayload({ ...trip.get({ plain: true }), ...req.body }, trip);
+    const validationError = validateTripPayload(payload);
+    if (validationError) return res.status(400).json({ error: validationError });
+
+    const carrier = await Carrier.findByPk(payload.carrierId);
+    if (!carrier) return res.status(404).json({ error: 'Carrier not found' });
+
+    await trip.update(payload);
+    return res.json({ message: 'Trip updated successfully', trip });
+  } catch (error) {
+    console.error('Failed to update trip:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteTrip = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    const bookingCount = await Booking.count({ where: { tripId: id } });
+    if (bookingCount > 0) {
+      return res.status(400).json({ error: 'Cannot delete trip with existing bookings' });
+    }
+
+    await trip.destroy();
+    return res.json({ message: 'Trip deleted successfully' });
+  } catch (error) {
+    console.error('Failed to delete trip:', error);
     return res.status(500).json({ error: error.message });
   }
 };

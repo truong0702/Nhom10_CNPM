@@ -7,9 +7,8 @@ export const walletApi = {
    */
   async getBalance() {
     try {
-      // This returns wallet info from profile
-      const response = await apiClient.get('/auth/profile');
-      return response.wallet;
+      const response = await apiClient.get('/wallet');
+      return response.data || response.wallet || response;
     } catch (error) {
       console.error('Failed to fetch wallet:', error);
       throw error;
@@ -21,10 +20,8 @@ export const walletApi = {
    */
   async getHistory() {
     try {
-      // This endpoint should be added to backend if needed
-      // For now, we'll rely on booking details which include transaction info
-      const response = await apiClient.get('/bookings');
-      return response.wallet?.history || [];
+      const response = await apiClient.get('/wallet/history');
+      return response.data || response.history || [];
     } catch (error) {
       console.error('Failed to fetch wallet history:', error);
       throw error;

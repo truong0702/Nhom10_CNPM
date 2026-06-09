@@ -1,7 +1,10 @@
 import express from 'express';
-import { getTrips, getTripById, getSeats } from '../controllers/trip.js';
+import { getTrips, getTripById, getSeats, getLocations } from '../controllers/trip.js';
 
 const router = express.Router();
+
+// GET /api/trips/locations - Get all available locations
+router.get('/locations', getLocations);
 
 // GET /api/trips/:id - Get trip by ID
 router.get('/:id', getTripById);

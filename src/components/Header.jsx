@@ -1,125 +1,121 @@
-import { FaBus, FaUser, FaSignOutAlt } from 'react-icons/fa'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { FaBus, FaChevronDown, FaSignOutAlt, FaUser } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext'
 
 export default function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const handleLogout = () => {
     logout()
-    navigate('/')
     setShowDropdown(false)
+    navigate('/')
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-gradient-to-r from-red-600 via-red-500 to-red-700 text-white shadow-xl">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 cursor-pointer group">
-          <div className="text-4xl transform group-hover:scale-110 transition">
-            <FaBus />
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <Link to="/" className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm">
+            <FaBus className="text-2xl" />
           </div>
           <div>
-            <h1 className="text-3xl font-black tracking-tight">Vexere</h1>
-            <p className="text-xs text-red-100">Đặt vé xe online</p>
+            <div className="text-2xl font-black tracking-tight text-slate-950">Vexere</div>
+            <div className="text-xs font-semibold text-slate-500">Đặt vé xe online</div>
           </div>
         </Link>
 
-        {/* Navigation */}
-        <nav className="flex gap-1 items-center">
+        <nav className="hidden items-center gap-1 md:flex">
           <NavLink label="Trang chủ" href="/" />
-          <NavLink label="Về chúng tôi" href="/" />
-          <NavLink label="Liên hệ" href="/" />
+          <NavLink label="Về chúng tôi" href="/about" />
+          <NavLink label="Liên hệ" href="/contact" />
+        </nav>
 
-          {/* User Section */}
+        <div className="flex items-center gap-3">
           {user ? (
-            <div className="relative ml-4">
+            <div className="relative">
               <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="bg-white text-red-600 px-6 py-2.5 rounded-lg hover:bg-red-50 transition font-bold shadow-lg hover:shadow-xl flex items-center gap-2"
+                type="button"
+                onClick={() => setShowDropdown((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-900 shadow-sm hover:border-red-200 hover:bg-red-50"
               >
-                <FaUser /> {user.fullName}
+                <FaUser className="text-red-600" />
+                <span className="max-w-[150px] truncate">{user.fullName}</span>
+                <FaChevronDown className="text-xs text-slate-400" />
               </button>
 
-              {/* Dropdown */}
               {showDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-xl shadow-2xl overflow-hidden z-50">
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <p className="font-bold text-sm">{user.email}</p>
+                <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
+                  <div className="border-b border-slate-100 px-4 py-3">
+                    <div className="text-sm font-black">{user.fullName}</div>
+                    <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">{user.email}</div>
                   </div>
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-3 hover:bg-red-50 transition font-semibold"
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    👤 Hồ sơ
-                  </Link>
 
-                  {/* Admin-only quản lý nhà xe, tài khoản và vé */}
-                  {user?.email === 'admin@gmail.com' && (
+                  <DropdownLink to="/profile" onClick={() => setShowDropdown(false)}>
+                    Hồ sơ
+                  </DropdownLink>
+
+                  {isAdmin && (
                     <>
-                      <Link
-                        to="/admin/carriers"
-                        className="block px-4 py-3 hover:bg-red-50 transition font-semibold"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        🚌 Quản lý nhà xe
-                      </Link>
-                      <Link
-                        to="/admin/users"
-                        className="block px-4 py-3 hover:bg-red-50 transition font-semibold"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        👥 Quản lý tài khoản
-                      </Link>
-                      <Link
-                        to="/admin/tickets"
-                        className="block px-4 py-3 hover:bg-red-50 transition font-semibold"
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        🎟️ Quản lý vé
-                      </Link>
+                      <div className="px-4 pb-1 pt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
+                        Quản trị
+                      </div>
+                      <DropdownLink to="/admin" onClick={() => setShowDropdown(false)}>
+                        Bảng quản trị
+                      </DropdownLink>
+                      <DropdownLink to="/admin/trips" onClick={() => setShowDropdown(false)}>
+                        Quản lý chuyến xe
+                      </DropdownLink>
+                      <DropdownLink to="/admin/tickets" onClick={() => setShowDropdown(false)}>
+                        Quản lý vé
+                      </DropdownLink>
+                      <DropdownLink to="/admin/payments" onClick={() => setShowDropdown(false)}>
+                        Quản lý thanh toán
+                      </DropdownLink>
+                      <DropdownLink to="/admin/users" onClick={() => setShowDropdown(false)}>
+                        Quản lý người dùng
+                      </DropdownLink>
+                      <DropdownLink to="/admin/carriers" onClick={() => setShowDropdown(false)}>
+                        Quản lý nhà xe
+                      </DropdownLink>
                     </>
                   )}
 
+                  {user.role === 'carrier' && (
+                    <DropdownLink to="/carrier" onClick={() => setShowDropdown(false)}>
+                      Khu vực nhà xe
+                    </DropdownLink>
+                  )}
 
+                  <DropdownLink to="/bookings" onClick={() => setShowDropdown(false)}>
+                    Vé của tôi
+                  </DropdownLink>
 
-                  <Link
-                    to="/bookings"
-                    className="block px-4 py-3 hover:bg-red-50 transition font-semibold"
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    🎫 Đặt vé của tôi
-                  </Link>
                   <button
+                    type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-3 hover:bg-red-50 transition font-semibold text-red-600 flex items-center gap-2 border-t border-gray-200"
+                    className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-left text-sm font-black text-red-600 hover:bg-red-50"
                   >
-                    <FaSignOutAlt /> Đăng xuất
+                    <FaSignOutAlt />
+                    Đăng xuất
                   </button>
                 </div>
               )}
             </div>
           ) : (
-            <>
-              <Link
-                to="/login"
-                className="text-white px-4 py-2 font-semibold hover:text-red-100 transition ml-4"
-              >
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="rounded-xl px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100">
                 Đăng nhập
               </Link>
-              <Link
-                to="/register"
-                className="bg-white text-red-600 px-6 py-2.5 rounded-lg hover:bg-red-50 transition font-bold shadow-lg hover:shadow-xl ml-2"
-              >
+              <Link to="/register" className="rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-red-700">
                 Đăng ký
               </Link>
-            </>
+            </div>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   )
@@ -127,9 +123,16 @@ export default function Header() {
 
 function NavLink({ label, href }) {
   return (
-    <Link to={href} className="px-4 py-2 text-white font-semibold hover:text-red-100 transition relative group">
+    <Link to={href} className="rounded-xl px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-100 hover:text-red-600">
       {label}
-      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-white group-hover:w-full transition-all duration-300"></span>
+    </Link>
+  )
+}
+
+function DropdownLink({ to, onClick, children }) {
+  return (
+    <Link to={to} onClick={onClick} className="block px-4 py-3 text-sm font-bold hover:bg-slate-50 hover:text-red-600">
+      {children}
     </Link>
   )
 }

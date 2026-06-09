@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
+import AdminLayout from './components/AdminLayout'
+import TripDetail from './components/TripDetail'
+import CarrierLayout from './components/CarrierLayout'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -13,16 +16,31 @@ import MyTickets from './pages/MyTickets'
 import AdminTicketManagement from './pages/AdminTicketManagement'
 import CarrierManagement from './pages/CarrierManagement'
 import UserManagement from './pages/UserManagement'
+import AdminPaymentManagement from './pages/AdminPaymentManagement'
+import AdminDashboard from './pages/AdminDashboard'
+import TripManagement from './pages/TripManagement'
+import CarrierPortal from './pages/CarrierPortal'
 import Checkout from './pages/Checkout'
 import SelectVehicleType from './pages/SelectVehicleType'
 import SelectVehicleVariant from './pages/SelectVehicleVariant'
 import SelectSeat from './pages/SelectSeat'
+import {
+  AboutPage,
+  BlogPage,
+  CareersPage,
+  ContactPage,
+  FaqPage,
+  PolicyPage,
+} from './pages/InfoPages'
 import './App.css'
 
 
 function AppContent() {
-  const { loading } = useAuth()
+  const { loading, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isAdminRoute = location.pathname.startsWith('/admin')
+  const isCarrierRoute = location.pathname.startsWith('/carrier')
 
   const [cartItems, setCartItems] = useState([])
   const total = useMemo(() => {
@@ -30,6 +48,15 @@ function AppContent() {
   }, [cartItems])
 
   const clearCart = () => setCartItems([])
+
+  useEffect(() => {
+    if (!loading && user?.role === 'admin' && !isAdminRoute && ['/', '/login'].includes(location.pathname)) {
+      navigate('/admin', { replace: true })
+    }
+    if (!loading && user?.role === 'carrier' && !isCarrierRoute && ['/', '/login'].includes(location.pathname)) {
+      navigate('/carrier', { replace: true })
+    }
+  }, [isAdminRoute, isCarrierRoute, loading, location.pathname, navigate, user])
 
   const startCheckoutFromTrips = (trips) => {
     // trips: [{id, bus, from, to, price, ...}]
@@ -62,10 +89,11 @@ function AppContent() {
 
   return (
     <>
-      <Header />
+      {!isAdminRoute && !isCarrierRoute && <Header />}
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home onProceedToCheckout={startCheckoutFromTrips} />} />
+          <Route path="/browse" element={<Home onProceedToCheckout={startCheckoutFromTrips} />} />
           <Route
             path="/checkout"
             element={
@@ -83,6 +111,7 @@ function AppContent() {
             }
           />
 
+          <Route path="/trip/:tripId" element={<TripDetail />} />
           <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleType />} />
           <Route path="/trip/:tripId/select-vehicle-variant" element={<SelectVehicleVariant />} />
           <Route path="/trip/:tripId/select-seat" element={<SelectSeat />} />
@@ -94,12 +123,24 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/bookings" element={<MyTickets />} />
-          <Route path="/admin/carriers" element={<CarrierManagement />} />
-          <Route path="/admin/users" element={<UserManagement />} />
-          <Route path="/admin/tickets" element={<AdminTicketManagement />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/careers" element={<CareersPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/policy" element={<PolicyPage />} />
+          <Route path="/admin" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
+          <Route path="/admin/trips" element={<AdminLayout><TripManagement /></AdminLayout>} />
+          <Route path="/admin/carriers" element={<AdminLayout><CarrierManagement /></AdminLayout>} />
+          <Route path="/admin/users" element={<AdminLayout><UserManagement /></AdminLayout>} />
+          <Route path="/admin/tickets" element={<AdminLayout><AdminTicketManagement /></AdminLayout>} />
+          <Route path="/admin/payments" element={<AdminLayout><AdminPaymentManagement /></AdminLayout>} />
+          <Route path="/carrier" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
+          <Route path="/carrier/trips" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
+          <Route path="/carrier/bookings" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
         </Routes>
       </main>
-      <Footer />
+      {!isAdminRoute && !isCarrierRoute && <Footer />}
     </>
   )
 }

@@ -73,7 +73,7 @@ export default function AdminTicketManagement() {
           >
             <option value="all">Tất cả</option>
             <option value="paid">Đã thanh toán</option>
-            <option value="processing">Đang xử lý</option>
+            <option value="pending">Đang xử lý</option>
             <option value="failed">Chưa thanh toán / Thất bại</option>
           </select>
         </div>
@@ -137,7 +137,7 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
       ? { text: 'Đã hủy', cls: 'bg-gray-100 text-gray-700 border-gray-200' }
       : status === 'paid'
         ? { text: 'Đã thanh toán', cls: 'bg-green-50 text-green-700 border-green-200' }
-        : status === 'processing'
+        : status === 'pending'
           ? { text: 'Đang xử lý', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
           : { text: 'Chưa thanh toán / Thất bại', cls: 'bg-red-50 text-red-700 border-red-200' }
 
@@ -186,7 +186,7 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
                 onClick={onMarkPaid}
                 className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-black hover:bg-green-700 transition shadow"
               >
-                Mark paid
+                Xác nhận đã thanh toán
               </button>
             )}
 
@@ -209,7 +209,7 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
         {(booking.items || []).map((it, idx) => (
           <div key={idx} className="border rounded-xl p-3 bg-slate-50">
-            <div className="text-sm font-bold text-slate-900">{it.title}</div>
+            <div className="text-sm font-bold text-slate-900">{it.title || it.description || it.tripId || 'Chuyến xe'}</div>
             <div className="text-xs text-slate-600 mt-1">
               {Number(it.price).toLocaleString('vi-VN')}đ × {it.qty}
             </div>
@@ -262,8 +262,8 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
               <div className="space-y-2">
                 {(booking.history || []).slice().reverse().map((h, idx) => (
                   <div key={idx} className="flex items-start justify-between gap-3 border-b pb-2 last:border-b-0">
-                    <div className="text-sm text-slate-800 font-semibold">{h.type}</div>
-                    <div className="text-xs text-slate-500">{new Date(h.at).toLocaleString('vi-VN')}</div>
+                    <div className="text-sm text-slate-800 font-semibold">{h.type || h.event || 'Cập nhật'}</div>
+                    <div className="text-xs text-slate-500">{formatDateTime(h.at || h.timestamp)}</div>
                   </div>
                 ))}
                 {!booking.history?.length && (
@@ -281,7 +281,7 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
                 {(booking.exchanges || []).length ? (
                   booking.exchanges.map((ex, idx) => (
                     <div key={idx} className="border rounded-xl p-3 bg-slate-50">
-                      <div className="text-xs text-slate-500">{new Date(ex.at).toLocaleString('vi-VN')}</div>
+                      <div className="text-xs text-slate-500">{formatDateTime(ex.at || ex.timestamp)}</div>
                       <div className="text-sm font-semibold text-slate-900 mt-1">Đổi vé</div>
                       <div className="text-xs text-slate-600 mt-1">Ghi chú: {ex.note || '-'}</div>
                     </div>
@@ -296,6 +296,12 @@ function AdminTicketCard({ booking, onMarkPaid, onCancelBooking, onExchangeBooki
       )}
     </div>
   )
+}
+
+function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('vi-VN')
 }
 
 

@@ -20,13 +20,24 @@ export const authApi = {
     return response;
   },
 
+  async registerCarrier(payload) {
+    const response = await apiClient.post('/auth/register-carrier', payload);
+
+    if (response.accessToken) {
+      apiClient.setToken(response.accessToken);
+    }
+
+    return response;
+  },
+
   /**
    * Login user
    */
-  async login(email, password) {
+  async login(email, password, loginAs = 'user') {
     const response = await apiClient.post('/auth/login', {
       email,
       password,
+      loginAs,
     });
 
     if (response.accessToken) {
@@ -41,6 +52,28 @@ export const authApi = {
    */
   async getProfile() {
     return await apiClient.get('/auth/profile');
+  },
+
+  async updateProfile(payload) {
+    return await apiClient.put('/auth/profile', payload);
+  },
+
+  async changePassword(oldPassword, newPassword) {
+    return await apiClient.post('/auth/change-password', {
+      oldPassword,
+      newPassword,
+    });
+  },
+
+  async forgotPassword(email) {
+    return await apiClient.post('/auth/forgot-password', { email });
+  },
+
+  async resetPassword(token, newPassword) {
+    return await apiClient.post('/auth/reset-password', {
+      token,
+      newPassword,
+    });
   },
 
   /**

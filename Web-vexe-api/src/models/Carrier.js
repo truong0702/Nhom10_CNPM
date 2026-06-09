@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
+import User from './User.js';
 
 const Carrier = sequelize.define(
   'Carrier',
@@ -25,6 +26,14 @@ const Carrier = sequelize.define(
     address: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    ownerUserId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: User,
+        key: 'id',
+      },
     },
     approved: {
       type: DataTypes.BOOLEAN,

@@ -13,9 +13,9 @@ export const getWalletBalance = async (userId) => {
 
 export const addWalletCredit = async (userId, amount, meta = {}) => {
   const wallet = await getWalletBalance(userId);
-  const oldBalance = wallet.balance;
+  const oldBalance = Number(wallet.balance || 0);
   
-  wallet.balance += amount;
+  wallet.balance = oldBalance + Number(amount || 0);
   wallet.history = wallet.history || [];
   
   wallet.history.push({
