@@ -74,6 +74,11 @@ const Trip = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    status: {
+      type: DataTypes.ENUM('active', 'inactive', 'cancelled'),
+      allowNull: false,
+      defaultValue: 'active',
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

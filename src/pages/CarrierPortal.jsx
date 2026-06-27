@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { FaEdit, FaPlus, FaSave, FaTrash } from 'react-icons/fa'
+import { FaBan, FaEdit, FaPlus, FaSave, FaTrash } from 'react-icons/fa'
 import carrierApi from '../services/carrierApi'
 
 const emptyForm = {
@@ -136,6 +136,33 @@ export default function CarrierPortal() {
     }
   }
 
+  const handleStatusChange = async (trip, status) => {
+    setLoading(true)
+    setError('')
+    try {
+      await carrierApi.setTripStatus(trip.id, status)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Không thể cập nhật trạng thái chuyến xe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancel = async (trip) => {
+    if (!window.confirm(`Hủy chuyến ${trip.from} → ${trip.to} ngày ${trip.date}?`)) return
+    setLoading(true)
+    setError('')
+    try {
+      await carrierApi.cancelTrip(trip.id)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Không thể hủy chuyến xe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Header carrier={carrier} />
@@ -160,7 +187,14 @@ export default function CarrierPortal() {
             onReset={resetForm}
             setField={setField}
           />
-          <TripTable trips={trips} loading={loading} onEdit={startEdit} onDelete={handleDelete} />
+          <TripTable
+            trips={trips}
+            loading={loading}
+            onEdit={startEdit}
+            onDelete={handleDelete}
+            onCancel={handleCancel}
+            onStatusChange={handleStatusChange}
+          />
         </>
       )}
 
@@ -252,7 +286,7 @@ function TripForm({ form, editingId, saving, onSubmit, onReset, setField }) {
   )
 }
 
-function TripTable({ trips, loading, onEdit, onDelete }) {
+function TripTable({ trips, loading, onEdit, onDelete, onCancel, onStatusChange }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-5">
@@ -265,24 +299,45 @@ function TripTable({ trips, loading, onEdit, onDelete }) {
               <th className="px-5 py-3">Tuyến</th>
               <th className="px-5 py-3">Ngày/Giờ</th>
               <th className="px-5 py-3">Ghế</th>
+              <th className="px-5 py-3">Trạng thái</th>
               <th className="px-5 py-3">Giá</th>
               <th className="px-5 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td></tr>
             ) : trips.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có chuyến xe</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có chuyến xe</td></tr>
             ) : trips.map((trip) => (
               <tr key={trip.id} className="border-t border-slate-100">
                 <td className="px-5 py-4"><div className="font-black">{trip.from} → {trip.to}</div><div className="text-xs text-slate-500">{trip.bus}</div></td>
                 <td className="px-5 py-4"><div className="font-bold">{trip.date}</div><div className="text-xs text-slate-500">{trip.departure} - {trip.arrival}</div></td>
                 <td className="px-5 py-4">{trip.seatsAvailable}/{trip.seats}</td>
+                <td className="px-5 py-4">
+                  <select
+                    value={trip.status || 'active'}
+                    onChange={(event) => onStatusChange(trip, event.target.value)}
+                    disabled={loading}
+                    className={`h-9 rounded-xl border px-3 text-xs font-black outline-none ${getStatusClass(trip.status)}`}
+                    aria-label="Đổi trạng thái chuyến"
+                  >
+                    <option value="active">Đang chạy</option>
+                    <option value="inactive">Tạm dừng</option>
+                    <option value="cancelled">Đã hủy</option>
+                  </select>
+                </td>
                 <td className="px-5 py-4 font-black text-red-600">{formatCurrency(trip.price)}</td>
                 <td className="px-5 py-4">
                   <div className="flex justify-end gap-2">
                     <button onClick={() => onEdit(trip)} className="rounded-xl border px-3 py-2 text-slate-600 hover:bg-slate-50"><FaEdit /></button>
+                    <button
+                      onClick={() => onCancel(trip)}
+                      disabled={(trip.status || 'active') === 'cancelled'}
+                      className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <FaBan />
+                    </button>
                     <button onClick={() => onDelete(trip)} className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100"><FaTrash /></button>
                   </div>
                 </td>
@@ -346,4 +401,10 @@ function Field({ label, children }) {
 
 function formatCurrency(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`
+}
+
+function getStatusClass(status = 'active') {
+  if (status === 'cancelled') return 'border-red-100 bg-red-50 text-red-700'
+  if (status === 'inactive') return 'border-amber-100 bg-amber-50 text-amber-700'
+  return 'border-emerald-100 bg-emerald-50 text-emerald-700'
 }

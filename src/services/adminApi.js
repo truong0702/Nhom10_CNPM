@@ -53,8 +53,44 @@ export const adminApi = {
     return await apiClient.delete(`/admin/trips/${id}`);
   },
 
+  async setTripStatus(id, status) {
+    return await apiClient.put(`/admin/trips/${id}/status`, { status });
+  },
+
+  async setTripDepartureTime(id, payload) {
+    return await apiClient.put(`/admin/trips/${id}/departure-time`, payload);
+  },
+
+  async setTripRoute(id, payload) {
+    return await apiClient.put(`/admin/trips/${id}/route`, payload);
+  },
+
+  async cancelTrip(id) {
+    return await apiClient.put(`/admin/trips/${id}/cancel`);
+  },
+
   async getBookings() {
     return await apiClient.get('/admin/bookings');
+  },
+
+  async getFeedbacks() {
+    return await apiClient.get('/admin/feedbacks');
+  },
+
+  async updateFeedback(id, payload) {
+    return await apiClient.put(`/admin/feedbacks/${id}`, payload);
+  },
+
+  async getConversations() {
+    return await apiClient.get('/chat/admin/conversations');
+  },
+
+  async getChatMessages(userId) {
+    return await apiClient.get(`/chat/admin/conversations/${userId}`);
+  },
+
+  async sendChatMessage(userId, payload) {
+    return await apiClient.post(`/chat/admin/conversations/${userId}`, payload);
   },
 };
 

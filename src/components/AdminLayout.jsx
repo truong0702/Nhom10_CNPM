@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   FaBus,
   FaChartLine,
+  FaCommentAlt,
+  FaComments,
   FaCreditCard,
   FaHome,
   FaRoute,
@@ -19,6 +21,8 @@ const adminLinks = [
   { to: '/admin/payments', label: 'Thanh toán', icon: FaCreditCard },
   { to: '/admin/users', label: 'Người dùng', icon: FaUsers },
   { to: '/admin/carriers', label: 'Nhà xe', icon: FaBus },
+  { to: '/admin/feedbacks', label: 'Góp ý & khiếu nại', icon: FaCommentAlt },
+  { to: '/admin/chat', label: 'Chat trực tuyến', icon: FaComments },
 ]
 
 export default function AdminLayout({ children }) {

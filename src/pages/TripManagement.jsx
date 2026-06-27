@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FaEdit, FaPlus, FaSave, FaSearch, FaTrash } from 'react-icons/fa'
+import { FaBan, FaEdit, FaPlus, FaSave, FaSearch, FaTrash } from 'react-icons/fa'
 import adminApi from '../services/adminApi.js'
 
 const emptyForm = {
@@ -140,6 +140,35 @@ export default function TripManagement() {
       await load()
     } catch (err) {
       setError(err.message || 'Không thể xóa chuyến xe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStatusChange = async (trip, status) => {
+    setLoading(true)
+    setError('')
+    try {
+      await adminApi.setTripStatus(trip.id, status)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Không thể cập nhật trạng thái chuyến xe')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancel = async (trip) => {
+    const ok = window.confirm(`Hủy chuyến ${trip.from} → ${trip.to} ngày ${trip.date}?`)
+    if (!ok) return
+
+    setLoading(true)
+    setError('')
+    try {
+      await adminApi.cancelTrip(trip.id)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Không thể hủy chuyến xe')
     } finally {
       setLoading(false)
     }
@@ -286,6 +315,7 @@ export default function TripManagement() {
                 <th className="px-5 py-3">Nhà xe</th>
                 <th className="px-5 py-3">Ngày/Giờ</th>
                 <th className="px-5 py-3">Ghế</th>
+                <th className="px-5 py-3">Trạng thái</th>
                 <th className="px-5 py-3">Giá</th>
                 <th className="px-5 py-3 text-right">Thao tác</th>
               </tr>
@@ -293,11 +323,11 @@ export default function TripManagement() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td>
+                  <td colSpan={7} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td>
                 </tr>
               ) : filteredTrips.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có chuyến xe phù hợp</td>
+                  <td colSpan={7} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có chuyến xe phù hợp</td>
                 </tr>
               ) : (
                 filteredTrips.map((trip) => (
@@ -316,6 +346,19 @@ export default function TripManagement() {
                         {trip.seatsAvailable}/{trip.seats}
                       </span>
                     </td>
+                    <td className="px-5 py-4">
+                      <select
+                        value={trip.status || 'active'}
+                        onChange={(event) => handleStatusChange(trip, event.target.value)}
+                        disabled={loading}
+                        className={`h-9 rounded-xl border px-3 text-xs font-black outline-none ${getStatusClass(trip.status)}`}
+                        aria-label="Đổi trạng thái chuyến"
+                      >
+                        <option value="active">Đang chạy</option>
+                        <option value="inactive">Tạm dừng</option>
+                        <option value="cancelled">Đã hủy</option>
+                      </select>
+                    </td>
                     <td className="px-5 py-4 font-black text-red-600">{formatCurrency(trip.price)}</td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
@@ -326,6 +369,15 @@ export default function TripManagement() {
                           aria-label="Sửa chuyến"
                         >
                           <FaEdit />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(trip)}
+                          disabled={(trip.status || 'active') === 'cancelled'}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label="Hủy chuyến"
+                        >
+                          <FaBan />
                         </button>
                         <button
                           type="button"
@@ -362,4 +414,10 @@ function Field({ label, children }) {
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('vi-VN') + 'đ'
+}
+
+function getStatusClass(status = 'active') {
+  if (status === 'cancelled') return 'border-red-100 bg-red-50 text-red-700'
+  if (status === 'inactive') return 'border-amber-100 bg-amber-50 text-amber-700'
+  return 'border-emerald-100 bg-emerald-50 text-emerald-700'
 }

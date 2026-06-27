@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { Booking, Carrier, Trip, User, Wallet } from '../models/index.js';
+import { Booking, Carrier, Trip, User, Wallet, Feedback } from '../models/index.js';
 
 const sanitizeUser = (user, wallet = null) => {
   const plain = user.get ? user.get({ plain: true }) : { ...user };
@@ -252,6 +252,7 @@ const normalizeTripPayload = (payload = {}, existingTrip = null) => {
     rating: payload.rating !== undefined && payload.rating !== '' ? Number(payload.rating) : existingTrip?.rating ?? 4.5,
     reviews: payload.reviews !== undefined && payload.reviews !== '' ? Number(payload.reviews) : existingTrip?.reviews ?? 0,
     image: payload.image || null,
+    status: ['active', 'inactive', 'cancelled'].includes(payload.status) ? payload.status : existingTrip?.status ?? 'active',
   };
 };
 
@@ -356,6 +357,131 @@ export const getBookings = async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to get bookings:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const getFeedbacks = async (req, res) => {
+  try {
+    const feedbacks = await Feedback.findAll({
+      include: [
+        {
+          model: User,
+          attributes: ['id', 'fullName', 'email', 'phone'],
+        },
+        {
+          model: Booking,
+          required: false,
+          include: [
+            {
+              model: Trip,
+              required: false,
+              attributes: ['id', 'from', 'to', 'bus', 'departure', 'date'],
+            },
+          ],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    return res.json({ feedbacks });
+  } catch (error) {
+    console.error('Failed to get feedbacks:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateFeedback = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminReply } = req.body;
+
+    const feedback = await Feedback.findByPk(id);
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    if (status !== undefined) feedback.status = status;
+    if (adminReply !== undefined) feedback.adminReply = adminReply;
+
+    await feedback.save();
+    return res.json({ message: 'Feedback updated successfully', feedback });
+  } catch (error) {
+    console.error('Failed to update feedback:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const setTripStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    if (!['active', 'inactive', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid trip status' });
+    }
+
+    await trip.update({
+      status,
+      seatsAvailable: status === 'cancelled' ? 0 : trip.seatsAvailable,
+    });
+    return res.json({ message: 'Trip status updated successfully', trip });
+  } catch (error) {
+    console.error('Failed to update trip status:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const setTripDepartureTime = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { departure, arrival, duration, date } = req.body;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    if (!departure) return res.status(400).json({ error: 'departure is required' });
+
+    await trip.update({
+      departure,
+      arrival: arrival ?? trip.arrival,
+      duration: duration ?? trip.duration,
+      date: date ?? trip.date,
+    });
+    return res.json({ message: 'Trip departure time updated successfully', trip });
+  } catch (error) {
+    console.error('Failed to update trip departure time:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const setTripRoute = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { from, to } = req.body;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    if (!from || !to) return res.status(400).json({ error: 'from and to are required' });
+
+    await trip.update({ from: from.trim(), to: to.trim() });
+    return res.json({ message: 'Trip route updated successfully', trip });
+  } catch (error) {
+    console.error('Failed to update trip route:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const cancelTrip = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const trip = await Trip.findByPk(id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    await trip.update({ status: 'cancelled', seatsAvailable: 0 });
+    return res.json({ message: 'Trip cancelled successfully', trip });
+  } catch (error) {
+    console.error('Failed to cancel trip:', error);
     return res.status(500).json({ error: error.message });
   }
 };

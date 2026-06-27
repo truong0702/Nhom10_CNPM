@@ -17,6 +17,22 @@ export const carrierApi = {
     return apiClient.put(`/carrier/trips/${id}`, payload);
   },
 
+  async setTripStatus(id, status) {
+    return apiClient.put(`/carrier/trips/${id}/status`, { status });
+  },
+
+  async setTripDepartureTime(id, payload) {
+    return apiClient.put(`/carrier/trips/${id}/departure-time`, payload);
+  },
+
+  async setTripRoute(id, payload) {
+    return apiClient.put(`/carrier/trips/${id}/route`, payload);
+  },
+
+  async cancelTrip(id) {
+    return apiClient.put(`/carrier/trips/${id}/cancel`);
+  },
+
   async deleteTrip(id) {
     return apiClient.delete(`/carrier/trips/${id}`);
   },

@@ -11,6 +11,7 @@ export const getTrips = async (req, res) => {
     if (from) where.from = from;
     if (to) where.to = to;
     if (date) where.date = date;
+    where.status = 'active';
 
     // Query trips
     const trips = await Trip.findAll({
@@ -152,6 +153,7 @@ export const getLocations = async (req, res) => {
     // Get all unique departure and destination locations
     const trips = await Trip.findAll({
       attributes: ['from', 'to'],
+      where: { status: 'active' },
       raw: true
     });
 

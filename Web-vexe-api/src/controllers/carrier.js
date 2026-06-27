@@ -23,7 +23,7 @@ const requireOwnedCarrier = async (req, res) => {
   return carrier;
 };
 
-const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
+export const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
   const seats = payload.seats !== undefined ? Number(payload.seats) : existingTrip?.seats;
   const seatsAvailable =
     payload.seatsAvailable !== undefined
@@ -47,10 +47,11 @@ const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
     rating: existingTrip?.rating ?? 4.5,
     reviews: existingTrip?.reviews ?? 0,
     image: payload.image || existingTrip?.image || null,
+    status: ['active', 'inactive', 'cancelled'].includes(payload.status) ? payload.status : existingTrip?.status ?? 'active',
   };
 };
 
-const validateTripPayload = (payload) => {
+export const validateTripPayload = (payload) => {
   const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'bus'];
   for (const field of required) {
     if (!payload[field]) return `${field} is required`;
@@ -155,6 +156,87 @@ export const deleteCarrierTrip = async (req, res) => {
   }
 };
 
+export const setCarrierTripStatus = async (req, res) => {
+  try {
+    const carrier = await requireOwnedCarrier(req, res);
+    if (!carrier) return;
+
+    const { status } = req.body;
+    if (!['active', 'inactive', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid trip status' });
+    }
+
+    const trip = await Trip.findOne({ where: { id: req.params.id, carrierId: carrier.id } });
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    await trip.update({
+      status,
+      seatsAvailable: status === 'cancelled' ? 0 : trip.seatsAvailable,
+    });
+    return res.json({ message: 'Trip status updated successfully', trip });
+  } catch (error) {
+    console.error('Update carrier trip status error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const setCarrierTripDepartureTime = async (req, res) => {
+  try {
+    const carrier = await requireOwnedCarrier(req, res);
+    if (!carrier) return;
+
+    const { departure, arrival, duration, date } = req.body;
+    const trip = await Trip.findOne({ where: { id: req.params.id, carrierId: carrier.id } });
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    if (!departure) return res.status(400).json({ error: 'departure is required' });
+
+    await trip.update({
+      departure,
+      arrival: arrival ?? trip.arrival,
+      duration: duration ?? trip.duration,
+      date: date ?? trip.date,
+    });
+    return res.json({ message: 'Trip departure time updated successfully', trip });
+  } catch (error) {
+    console.error('Update carrier trip departure time error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const setCarrierTripRoute = async (req, res) => {
+  try {
+    const carrier = await requireOwnedCarrier(req, res);
+    if (!carrier) return;
+
+    const { from, to } = req.body;
+    const trip = await Trip.findOne({ where: { id: req.params.id, carrierId: carrier.id } });
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    if (!from || !to) return res.status(400).json({ error: 'from and to are required' });
+
+    await trip.update({ from: from.trim(), to: to.trim() });
+    return res.json({ message: 'Trip route updated successfully', trip });
+  } catch (error) {
+    console.error('Update carrier trip route error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const cancelCarrierTrip = async (req, res) => {
+  try {
+    const carrier = await requireOwnedCarrier(req, res);
+    if (!carrier) return;
+
+    const trip = await Trip.findOne({ where: { id: req.params.id, carrierId: carrier.id } });
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+    await trip.update({ status: 'cancelled', seatsAvailable: 0 });
+    return res.json({ message: 'Trip cancelled successfully', trip });
+  } catch (error) {
+    console.error('Cancel carrier trip error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 export const getCarrierBookings = async (req, res) => {
   try {
     const carrier = await requireOwnedCarrier(req, res);
@@ -185,5 +267,9 @@ export default {
   createCarrierTrip,
   updateCarrierTrip,
   deleteCarrierTrip,
+  setCarrierTripStatus,
+  setCarrierTripDepartureTime,
+  setCarrierTripRoute,
+  cancelCarrierTrip,
   getCarrierBookings,
 };
