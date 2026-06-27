@@ -93,6 +93,9 @@ export default function Header() {
                   <DropdownLink to="/bookings" onClick={() => setShowDropdown(false)}>
                     Vé của tôi
                   </DropdownLink>
+                  <DropdownLink to="/support" onClick={() => setShowDropdown(false)}>
+                    CSKH
+                  </DropdownLink>
 
                   <button
                     type="button"

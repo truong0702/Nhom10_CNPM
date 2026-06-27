@@ -18,12 +18,19 @@ import CarrierManagement from './pages/CarrierManagement'
 import UserManagement from './pages/UserManagement'
 import AdminPaymentManagement from './pages/AdminPaymentManagement'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminFinancePage from './pages/AdminFinancePage'
+import SubscriptionPage from './pages/SubscriptionPage'
+import VehicleManagement from './pages/VehicleManagement'
 import TripManagement from './pages/TripManagement'
 import CarrierPortal from './pages/CarrierPortal'
 import Checkout from './pages/Checkout'
 import SelectVehicleType from './pages/SelectVehicleType'
 import SelectVehicleVariant from './pages/SelectVehicleVariant'
 import SelectSeat from './pages/SelectSeat'
+import PassengerInfo from './pages/PassengerInfo'
+import CustomerSupport from './pages/CustomerSupport'
+import AdminFeedbackManagement from './pages/AdminFeedbackManagement'
+import AdminChatManagement from './pages/AdminChatManagement'
 import {
   AboutPage,
   BlogPage,
@@ -76,7 +83,16 @@ function AppContent() {
     // For simplicity: if multiple trips selected, start from the first one.
     const first = (trips && trips[0]) || null
     if (first) {
-      navigate(`/trip/${first.id}/select-vehicle-type`)
+      const busName = String(first.bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+      const isSleeping = busName.includes('giuong') || busName.includes('sleeper') || busName.includes('nam')
+      const isVip = busName.includes('vip')
+      const isComfort = busName.includes('comfort') || busName.includes('premium') || busName.includes('limousine')
+      const vehicleType = isSleeping ? 'sleeping' : 'seating'
+      const vehicleVariant = isVip ? 'vip' : isComfort ? 'comfort' : 'standard'
+
+      navigate(`/trip/${first.id}/select-seat`, {
+        state: { vehicleType, vehicleVariant },
+      })
     } else {
       navigate('/checkout')
     }
@@ -115,6 +131,7 @@ function AppContent() {
           <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleType />} />
           <Route path="/trip/:tripId/select-vehicle-variant" element={<SelectVehicleVariant />} />
           <Route path="/trip/:tripId/select-seat" element={<SelectSeat />} />
+          <Route path="/trip/:tripId/passenger-info" element={<PassengerInfo />} />
 
 
           <Route path="/login" element={<Login />} />
@@ -123,6 +140,8 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/bookings" element={<MyTickets />} />
+          <Route path="/support" element={<CustomerSupport />} />
+          <Route path="/subscriptions" element={<SubscriptionPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/blog" element={<BlogPage />} />
@@ -135,9 +154,13 @@ function AppContent() {
           <Route path="/admin/users" element={<AdminLayout><UserManagement /></AdminLayout>} />
           <Route path="/admin/tickets" element={<AdminLayout><AdminTicketManagement /></AdminLayout>} />
           <Route path="/admin/payments" element={<AdminLayout><AdminPaymentManagement /></AdminLayout>} />
+          <Route path="/admin/feedbacks" element={<AdminLayout><AdminFeedbackManagement /></AdminLayout>} />
+          <Route path="/admin/chat" element={<AdminLayout><AdminChatManagement /></AdminLayout>} />
+          <Route path="/admin/finance" element={<AdminLayout><AdminFinancePage /></AdminLayout>} />
           <Route path="/carrier" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/trips" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/bookings" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
+          <Route path="/carrier/vehicles" element={<CarrierLayout><VehicleManagement /></CarrierLayout>} />
         </Routes>
       </main>
       {!isAdminRoute && !isCarrierRoute && <Footer />}

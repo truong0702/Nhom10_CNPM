@@ -10,6 +10,12 @@ import walletRoutes from './src/routes/wallet.js';
 import adminRoutes from './src/routes/admin.js';
 import paymentRoutes from './src/routes/payment.js';
 import carrierRoutes from './src/routes/carrier.js';
+import feedbackRoutes from './src/routes/feedback.js';
+import chatRoutes from './src/routes/chat.js';
+import customerRoutes from './src/routes/customer.js';
+import uc36to44Routes from './src/routes/uc36to44.js';
+import vehicleRoutes from './src/routes/vehicle.js';
+import supportRoutes from './src/routes/support.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { Carrier, Trip, User, Wallet } from './src/models/index.js';
 
@@ -31,7 +37,7 @@ const corsOptions = {
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
     ];
-    
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -45,10 +51,10 @@ app.use(cors(corsOptions));
 
 // Routes
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    message: 'Server is running', 
+  res.json({
+    message: 'Server is running',
     timestamp: new Date(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV
   });
 });
 
@@ -59,6 +65,12 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/carrier', carrierRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/customer', customerRoutes);
+app.use('/api', uc36to44Routes);
+app.use('/api/carrier/vehicles', vehicleRoutes);
+app.use('/api/support', supportRoutes);
 
 // 404 handler
 app.use((req, res) => {

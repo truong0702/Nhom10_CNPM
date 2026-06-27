@@ -7,6 +7,7 @@ const links = [
   { to: '/carrier', label: 'Tổng quan', icon: FaHome },
   { to: '/carrier/trips', label: 'Chuyến xe', icon: FaRoute },
   { to: '/carrier/bookings', label: 'Vé đã đặt', icon: FaTicketAlt },
+  { to: '/carrier/vehicles', label: 'Quản lý xe', icon: FaBus },
 ]
 
 export default function CarrierLayout({ children }) {
