@@ -180,8 +180,8 @@ export default function AdminPaymentManagement() {
                   <tr key={payment.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3 text-xs font-mono">{payment.id.slice(0, 8)}...</td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-sm">{payment.user?.fullName}</div>
-                      <div className="text-xs text-gray-500">{payment.user?.email}</div>
+                      <div className="font-semibold text-sm">{payment.booking?.items?.[0]?.passengerName || payment.user?.fullName}</div>
+                      <div className="text-xs text-gray-500">{payment.booking?.items?.[0]?.passengerEmail || payment.user?.email}</div>
                     </td>
                     <td className="px-4 py-3 font-bold text-red-600">
                       {(payment.amount || 0).toLocaleString('vi-VN')}đ
@@ -250,9 +250,9 @@ export default function AdminPaymentManagement() {
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                 <div className="text-xs font-semibold text-purple-600 mb-2">THÔNG TIN KHÁCH HÀNG</div>
                 <div className="space-y-1 text-sm">
-                  <div><span className="font-semibold">Tên:</span> {selectedPayment.user?.fullName}</div>
-                  <div><span className="font-semibold">Email:</span> {selectedPayment.user?.email}</div>
-                  <div><span className="font-semibold">SĐT:</span> {selectedPayment.user?.phone || 'N/A'}</div>
+                  <div><span className="font-semibold">Tên:</span> {selectedPayment.booking?.items?.[0]?.passengerName || selectedPayment.user?.fullName}</div>
+                  <div><span className="font-semibold">Email:</span> {selectedPayment.booking?.items?.[0]?.passengerEmail || selectedPayment.user?.email}</div>
+                  <div><span className="font-semibold">SĐT:</span> {selectedPayment.booking?.items?.[0]?.passengerPhone || selectedPayment.user?.phone || 'N/A'}</div>
                 </div>
               </div>
 

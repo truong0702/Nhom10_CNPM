@@ -13,8 +13,8 @@ export default function SelectSeat() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const vehicleType = location.state?.vehicleType || ''
-  const vehicleVariant = location.state?.vehicleVariant || null
+  const [vehicleType, setVehicleType] = useState(location.state?.vehicleType || '')
+  const [vehicleVariant, setVehicleVariant] = useState(location.state?.vehicleVariant || '')
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -24,8 +24,24 @@ export default function SelectSeat() {
           apiClient.get(`/trips/${tripId}`),
           apiClient.get(`/trips/${tripId}/seats`),
         ])
-        setTrip(tripResponse.data)
+        const tripData = tripResponse.data
+        setTrip(tripData)
         setOccupiedSeatLabels(seatResponse.data?.occupiedSeatLabels || [])
+
+        // Auto-detect type and variant if not passed via state
+        const currentType = location.state?.vehicleType || vehicleType
+        if (!currentType && tripData?.bus) {
+          const busName = String(tripData.bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+          const isSleeping = busName.includes('giuong') || busName.includes('sleeper') || busName.includes('nam')
+          const isVip = busName.includes('vip')
+          const isComfort = busName.includes('comfort') || busName.includes('premium') || busName.includes('limousine')
+          
+          setVehicleType(isSleeping ? 'sleeping' : 'seating')
+          setVehicleVariant(isVip ? 'vip' : isComfort ? 'comfort' : 'standard')
+        } else if (location.state?.vehicleVariant) {
+          setVehicleVariant(location.state.vehicleVariant)
+        }
+
         setError('')
       } catch (err) {
         setError(err.message || 'Failed to fetch trip')
@@ -120,7 +136,7 @@ export default function SelectSeat() {
     }
     localStorage.setItem(key, JSON.stringify(map))
 
-    navigate('/checkout')
+    navigate(`/trip/${tripId}/passenger-info`)
   }
 
   if (loading) {

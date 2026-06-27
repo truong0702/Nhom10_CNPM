@@ -8,6 +8,7 @@ import {
 } from '../utils/bookingsStorage'
 import { walletApi } from '../services/walletApi'
 import ExchangeTicketModal from '../components/ExchangeTicketModal'
+import QRCodeModal from '../components/QRCodeModal'
 
 export default function MyTickets() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function MyTickets() {
   const [error, setError] = useState('')
   const [busyBookingId, setBusyBookingId] = useState(null)
   const [exchangingBookingId, setExchangingBookingId] = useState(null)
+  const [qrBooking, setQrBooking] = useState(null)
 
   const refresh = async () => {
     setError('')
@@ -107,6 +109,7 @@ export default function MyTickets() {
                     }
                   }}
                   onExchange={() => setExchangingBookingId(booking.id)}
+                  onShowQR={() => setQrBooking(booking)}
                 />
               ))
             ) : (
@@ -171,6 +174,10 @@ export default function MyTickets() {
         />
       )}
 
+      {qrBooking && (
+        <QRCodeModal booking={qrBooking} onClose={() => setQrBooking(null)} />
+      )}
+
       <div className="mt-8 text-xs text-slate-400">
         Phí hủy vé: 10%, phí đổi vé: 5%
       </div>
@@ -195,7 +202,7 @@ function Empty() {
   )
 }
 
-function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
+function TicketCard({ booking, canInteract, busy, onCancel, onExchange, onShowQR }) {
   const [expanded, setExpanded] = useState(false)
   const [localCancelReason, setLocalCancelReason] = useState(booking.cancelReason || 'Không hài lòng với chuyến đi')
 
@@ -221,8 +228,19 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
           </div>
         </div>
 
-        <div className={`rounded-full border px-3 py-1 text-xs font-bold ${statusLabel.cls}`}>
-          {statusLabel.text}
+        <div className="flex flex-col items-end gap-2">
+          <div className={`rounded-full border px-3 py-1 text-xs font-bold ${statusLabel.cls}`}>
+            {statusLabel.text}
+          </div>
+          {canInteract && booking.cancelStatus !== 'canceled' && onShowQR && (
+            <button
+              onClick={onShowQR}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+              type="button"
+            >
+              📱 Xem QR
+            </button>
+          )}
         </div>
       </div>
 
@@ -247,7 +265,7 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange }) {
           <div key={index} className="flex items-center justify-between gap-3 text-sm">
             <div className="text-slate-700">{item.title || item.description || item.tripId || 'Chuyến xe'}</div>
             <div className="font-semibold text-slate-900">
-              {formatCurrency(item.price)} x {item.qty || item.seats || 1}
+              {formatCurrency(item.price)} x {item.seats || item.qty || 1}
             </div>
           </div>
         ))}

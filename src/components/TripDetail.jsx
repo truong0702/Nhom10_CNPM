@@ -97,12 +97,23 @@ export default function TripDetail() {
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to={`/trip/${trip.id}/select-vehicle-type`}
+              <button
+                onClick={() => {
+                  const busName = String(trip.bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+                  const isSleeping = busName.includes('giuong') || busName.includes('sleeper') || busName.includes('nam')
+                  const isVip = busName.includes('vip')
+                  const isComfort = busName.includes('comfort') || busName.includes('premium') || busName.includes('limousine')
+                  const vehicleType = isSleeping ? 'sleeping' : 'seating'
+                  const vehicleVariant = isVip ? 'vip' : isComfort ? 'comfort' : 'standard'
+
+                  navigate(`/trip/${trip.id}/select-seat`, {
+                    state: { vehicleType, vehicleVariant },
+                  })
+                }}
                 className="inline-flex flex-1 items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-100 hover:bg-red-700"
               >
-                Chọn xe và ghế
-              </Link>
+                Chọn ghế
+              </button>
               <Link
                 to={`/?from=${encodeURIComponent(trip.from)}&to=${encodeURIComponent(trip.to)}&date=${trip.date}`}
                 className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"

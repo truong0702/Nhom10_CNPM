@@ -337,7 +337,7 @@ export const getPaymentsAdmin = async (req, res) => {
       where,
       include: [
         { model: Booking, attributes: ['id', 'items', 'total'] },
-        { model: User, attributes: ['id', 'email', 'fullName'] },
+        { model: User, attributes: ['id', 'email', 'fullName', 'phone'] },
       ],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
@@ -360,6 +360,11 @@ export const getPaymentsAdmin = async (req, res) => {
         user: {
           fullName: p.User?.fullName,
           email: p.User?.email,
+          phone: p.User?.phone,
+        },
+        booking: {
+          items: p.Booking?.items,
+          total: p.Booking?.total,
         },
         createdAt: p.createdAt,
         verifiedAt: p.verifiedAt,

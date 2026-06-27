@@ -25,24 +25,37 @@ export const createBookingFromCart = async (userIdOrPayload, tripId, cartItems) 
     throw new Error('createBookingFromCart: items must be an array');
   }
 
-  const normalizedItems = items.map(item => ({
-    id: item.id,
-    title: item.title || item.name || '',
-    tripId: item.tripId || item.id,
-    price: item.price ?? item.amount ?? 0,
-    qty: item.qty ?? item.quantity ?? 1,
-    seats: item.seats ?? item.selectedSeatLabels?.length ?? item.selectedSeats?.length ?? item.qty ?? item.quantity ?? 1,
-    vehicleType: item.vehicleType ?? item.type,
-    vehicleVariant: item.vehicleVariant ?? item.variant,
-    seatType: item.seatType ?? item.seat_type,
-    selectedSeatLabels: item.selectedSeatLabels || item.selectedSeats || [],
-    seatPrices: item.seatPrices || [],
-    total: item.total ?? item.totalPrice ?? (
+  let passengerInfo = {}
+  try {
+    passengerInfo = JSON.parse(localStorage.getItem('vexere_passenger') || '{}')
+  } catch { passengerInfo = {} }
+
+  const normalizedItems = items.map(item => {
+    const seatsCount = item.seats ?? item.selectedSeatLabels?.length ?? item.selectedSeats?.length ?? item.qty ?? item.quantity ?? 1;
+    const computedTotal = item.total ?? item.totalPrice ?? (
       Array.isArray(item.seatPrices) && item.seatPrices.length
         ? item.seatPrices.reduce((sum, price) => sum + Number(price || 0), 0)
         : (item.price ?? item.amount ?? 0) * (item.qty ?? item.quantity ?? 1)
-    ),
-  }));
+    );
+    const avgPrice = Math.round(computedTotal / (seatsCount || 1));
+    return {
+      id: item.id,
+      title: item.title || item.name || '',
+      tripId: item.tripId || item.id,
+      price: avgPrice,
+      qty: item.qty ?? item.quantity ?? 1,
+      seats: seatsCount,
+      vehicleType: item.vehicleType ?? item.type,
+      vehicleVariant: item.vehicleVariant ?? item.variant,
+      seatType: item.seatType ?? item.seat_type,
+      selectedSeatLabels: item.selectedSeatLabels || item.selectedSeats || [],
+      seatPrices: item.seatPrices || [],
+      total: computedTotal,
+      passengerName: passengerInfo.passengerName || null,
+      passengerPhone: passengerInfo.passengerPhone || null,
+      passengerEmail: passengerInfo.passengerEmail || null,
+    };
+  });
 
   const total = normalizedItems.reduce((sum, it) => sum + it.total, 0);
 
