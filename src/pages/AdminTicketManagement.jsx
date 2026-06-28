@@ -15,6 +15,7 @@ export default function AdminTicketManagement() {
 
   const [bookings, setBookings] = useState([])
   const [statusFilter, setStatusFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState('')
 
   const [cancelReason, setCancelReason] = useState('Không có')
@@ -46,9 +47,18 @@ export default function AdminTicketManagement() {
   }, [user])
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return bookings
-    return bookings.filter((b) => b.paymentStatus === statusFilter)
-  }, [bookings, statusFilter])
+    const query = searchTerm.toLowerCase().trim()
+    return bookings.filter((b) => {
+      if (query) {
+        const matchesId = b.id?.toLowerCase().includes(query)
+        const matchesEmail =
+          (b.userEmail || b.user?.email || b.userId)?.toLowerCase().includes(query)
+        return matchesId || matchesEmail
+      }
+      if (statusFilter !== 'all' && b.paymentStatus !== statusFilter) return false
+      return true
+    })
+  }, [bookings, statusFilter, searchTerm])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -63,23 +73,36 @@ export default function AdminTicketManagement() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-4">
-        <div className="flex gap-2 items-center">
-          <span className="text-sm font-bold text-slate-700">Lọc trạng thái:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border-2 border-gray-200 focus:outline-none focus:border-red-500 font-semibold bg-white"
-          >
-            <option value="all">Tất cả</option>
-            <option value="paid">Đã thanh toán</option>
-            <option value="pending">Đang xử lý</option>
-            <option value="failed">Chưa thanh toán / Thất bại</option>
-          </select>
+      <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between mb-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center flex-1">
+          <div className="flex gap-2 items-center">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 font-semibold text-sm bg-slate-50"
+            >
+              <option value="all">Tất cả</option>
+              <option value="paid">Đã thanh toán</option>
+              <option value="pending">Đang xử lý</option>
+              <option value="failed">Chưa thanh toán / Thất bại</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2 items-center flex-1 max-w-lg">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">Tìm kiếm:</span>
+            <input
+              type="text"
+              placeholder="Tìm theo Mã vé (Booking ID) hoặc Email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:border-red-500 font-semibold text-sm bg-slate-50"
+            />
+          </div>
         </div>
 
         <button
-          className="px-4 py-2 rounded-xl border hover:bg-slate-50 transition text-sm font-semibold"
+          className="px-4 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition text-sm font-black text-slate-700 shrink-0"
           onClick={refresh}
         >
           Làm mới

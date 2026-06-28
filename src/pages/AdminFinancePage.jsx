@@ -33,6 +33,7 @@ export default function AdminFinancePage() {
   const [bookings, setBookings] = useState([]);
   const [result, setResult] = useState(null);
   const [resultType, setResultType] = useState(null); // 'fee', 'split', 'cod', 'reconciliation', 'report'
+  const [successRecord, setSuccessRecord] = useState(null);
   const [message, setMessage] = useState('');
 
   const loadBookings = async () => {
@@ -50,14 +51,32 @@ export default function AdminFinancePage() {
 
   const run = async (action, type) => {
     setMessage('');
-    setResult(null);
-    setResultType(null);
+    setSuccessRecord(null);
     try {
       const data = await action();
-      setResult(data);
-      setResultType(type);
       if (type === 'cod' || type === 'split') {
         loadBookings();
+        setSuccessRecord(data.record || data);
+        
+        // Auto-refresh active report or reconciliation dashboard in background if active
+        if (fromTo.from || fromTo.to) {
+          if (resultType === 'reconciliation' || (result && result.reconciliation)) {
+            const freshRecon = await financeAdminApi.reconciliation(fromTo);
+            setResult(freshRecon);
+            setResultType('reconciliation');
+          } else if (resultType === 'report') {
+            const freshReport = await financeAdminApi.revenueReport(fromTo);
+            setResult(freshReport);
+            setResultType('report');
+          }
+        } else {
+          // If no dates are set, show the standalone green confirmation page
+          setResult(data);
+          setResultType(type);
+        }
+      } else {
+        setResult(data);
+        setResultType(type);
       }
     } catch (error) {
       setMessage(error.message);
@@ -69,19 +88,53 @@ export default function AdminFinancePage() {
     alert('Đã sao chép mã giao dịch: ' + text);
   };
 
-  const handleFillPaymentId = async (paymentId) => {
+  const handleQuickSplit = async (paymentId) => {
+    setMessage('');
+    setSuccessRecord(null);
     try {
+      // 1. Fetch payment details from backend
       const res = await apiClient.get(`/payments/${paymentId}`);
-      if (res.payment) {
-        setSplitForm({
-          paymentId: res.payment.id,
-          amount: res.payment.amount,
-          platformPercent: 10
-        });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!res || !res.payment) {
+        alert('Không tìm thấy thông tin thanh toán này trên hệ thống.');
+        return;
       }
+
+      const amountVal = Number(res.payment.amount || 0);
+      const confirmSplit = window.confirm(
+        `Bạn có muốn thực hiện phân bổ nhanh cho giao dịch này?\n\n` +
+        `- Mã giao dịch: ${paymentId}\n` +
+        `- Số tiền: ${money(amountVal)}\n` +
+        `- Tỷ lệ phí sàn mặc định: 10%\n\n` +
+        `Bấm OK để xác nhận và thực hiện phân bổ ngay.`
+      );
+      if (!confirmSplit) return;
+
+      // 2. Execute split transaction
+      const splitResult = await financeAdminApi.splitPayment({
+        paymentId: res.payment.id,
+        amount: amountVal,
+        platformPercent: 10
+      });
+
+      setSuccessRecord(splitResult.record || splitResult);
+      setMessage('');
+      loadBookings();
+
+      // 3. Refresh reconciliation results immediately if dates are set
+      if (fromTo.from || fromTo.to) {
+        const freshRecon = await financeAdminApi.reconciliation(fromTo);
+        setResult(freshRecon);
+        setResultType('reconciliation');
+      } else {
+        setResult(splitResult);
+        setResultType('split');
+      }
+
+      // Scroll to top to see success banner
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
     } catch (error) {
-      alert('Không thể tải thông tin thanh toán: ' + error.message);
+      alert('Không thể thực hiện phân bổ nhanh: ' + error.message);
     }
   };
 
@@ -99,6 +152,27 @@ export default function AdminFinancePage() {
         <div className="text-sm font-black uppercase tracking-wide text-red-600">Vận hành Tài chính</div>
         <h1 className="mt-2 text-3xl font-black text-slate-950">Quản lý Doanh thu & Đối soát</h1>
       </section>
+
+      {successRecord && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2">
+            <FaCheckCircle className="text-emerald-600 text-lg shrink-0" />
+            <div>
+              <span className="font-bold">Ghi nhận giao dịch thành công!</span> Mã bản ghi: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-100 font-bold">#{successRecord.id}</span>
+              {successRecord.grossAmount && (
+                <span> - Số tiền: <span className="font-black text-slate-800">{money(successRecord.grossAmount)}</span> (Thuế/Phí sàn: {money(successRecord.platformFee)})</span>
+              )}
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setSuccessRecord(null)}
+            className="text-emerald-500 hover:text-emerald-700 font-black shrink-0 ml-4"
+          >
+            Đóng
+          </button>
+        </div>
+      )}
 
       {message && <div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{message}</div>}
 
@@ -364,7 +438,7 @@ export default function AdminFinancePage() {
                         </button>
                         <button 
                           type="button"
-                          onClick={() => handleFillPaymentId(id)}
+                          onClick={() => handleQuickSplit(id)}
                           className="px-2 py-1 text-white bg-slate-950 rounded-lg hover:bg-slate-900 font-bold"
                         >
                           Phân bổ ngay
