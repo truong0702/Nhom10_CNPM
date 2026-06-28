@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   FaCalculator, 
   FaChartLine, 
@@ -9,12 +9,13 @@ import {
   FaExclamationTriangle 
 } from 'react-icons/fa';
 import financeAdminApi from '../services/financeAdminApi.js';
+import adminApi from '../services/adminApi.js';
 
 const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VND`;
 
-function Field({ label, children }) {
+function Field({ label, children, className = '' }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <span className="text-sm font-bold text-slate-700">{label}</span>
       {children}
     </label>
@@ -28,9 +29,23 @@ export default function AdminFinancePage() {
   const [splitForm, setSplitForm] = useState({ paymentId: '', amount: 500000, platformPercent: 10 });
   const [codForm, setCodForm] = useState({ bookingId: '', amount: 300000, collectedBy: '' });
   const [fromTo, setFromTo] = useState({ from: '', to: '' });
+  const [bookings, setBookings] = useState([]);
   const [result, setResult] = useState(null);
   const [resultType, setResultType] = useState(null); // 'fee', 'split', 'cod', 'reconciliation', 'report'
   const [message, setMessage] = useState('');
+
+  const loadBookings = async () => {
+    try {
+      const res = await adminApi.getBookings();
+      setBookings(res.bookings || []);
+    } catch (e) {
+      console.error("Failed to load bookings in finance page", e);
+    }
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, []);
 
   const run = async (action, type) => {
     setMessage('');
@@ -40,6 +55,9 @@ export default function AdminFinancePage() {
       const data = await action();
       setResult(data);
       setResultType(type);
+      if (type === 'cod' || type === 'split') {
+        loadBookings();
+      }
     } catch (error) {
       setMessage(error.message);
     }
@@ -53,6 +71,14 @@ export default function AdminFinancePage() {
   const handleFillPaymentId = (paymentId) => {
     setSplitForm(prev => ({ ...prev, paymentId }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFillBookingId = (booking) => {
+    setCodForm({
+      bookingId: booking.id,
+      amount: booking.total,
+      collectedBy: 'Tài xế/Nhân viên quầy'
+    });
   };
 
   return (
@@ -116,29 +142,62 @@ export default function AdminFinancePage() {
           <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-900 transition-colors">Phân bổ ngay</button>
         </form>
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            run(() => financeAdminApi.recordCod(codForm), 'cod');
-          }}
-          className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="flex items-center gap-2 text-xl font-black text-slate-950">
             <FaMoneyBillWave /> Ghi nhận doanh thu COD
           </h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="Mã đặt vé (Booking ID)">
-              <input className={inputClass} value={codForm.bookingId} onChange={(e) => setCodForm({ ...codForm, bookingId: e.target.value })} placeholder="Ví dụ: B-1001" />
-            </Field>
-            <Field label="Số tiền thu hộ (VND)">
-              <input className={inputClass} type="number" value={codForm.amount} onChange={(e) => setCodForm({ ...codForm, amount: e.target.value })} />
-            </Field>
-            <Field label="Người thu hộ">
-              <input className={inputClass} value={codForm.collectedBy} onChange={(e) => setCodForm({ ...codForm, collectedBy: e.target.value })} placeholder="Tên tài xế/Nhân viên" />
-            </Field>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                run(() => financeAdminApi.recordCod(codForm), 'cod');
+              }}
+              className="flex-1 space-y-4"
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Mã đặt vé (Booking ID)">
+                  <input className={inputClass} value={codForm.bookingId} onChange={(e) => setCodForm({ ...codForm, bookingId: e.target.value })} placeholder="Dán mã UUID từ vé" />
+                </Field>
+                <Field label="Số tiền thu hộ (VND)">
+                  <input className={inputClass} type="number" value={codForm.amount} onChange={(e) => setCodForm({ ...codForm, amount: e.target.value })} />
+                </Field>
+                <Field label="Người thu hộ" className="sm:col-span-2">
+                  <input className={inputClass} value={codForm.collectedBy} onChange={(e) => setCodForm({ ...codForm, collectedBy: e.target.value })} placeholder="Tên tài xế/Nhân viên" />
+                </Field>
+              </div>
+              <button className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 transition-colors">Ghi nhận COD</button>
+            </form>
+
+            <div className="border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 lg:pl-6 space-y-3 min-w-[200px] lg:max-w-[260px]">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Chọn nhanh vé trong hệ thống</h3>
+              <div className="overflow-y-auto max-h-48 space-y-2 pr-1">
+                {bookings.map((b) => (
+                  <div key={b.id} className="p-2.5 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors text-3xs font-bold border border-slate-100 flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-slate-700 truncate max-w-[120px]">{b.id}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-4xs font-black uppercase ${b.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {b.paymentStatus === 'paid' ? 'Đã thu' : 'Chưa thu'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-500 text-4xs">
+                      <span>{money(b.total)}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => handleFillBookingId(b)}
+                        className="text-emerald-600 hover:text-emerald-700 font-black hover:underline"
+                      >
+                        Điền mã
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {bookings.length === 0 && (
+                  <p className="text-4xs font-bold text-slate-400 text-center py-6">Không tìm thấy vé nào.</p>
+                )}
+              </div>
+            </div>
           </div>
-          <button className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 transition-colors">Ghi nhận COD</button>
-        </form>
+        </div>
 
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="flex items-center gap-2 text-xl font-black text-slate-950">
