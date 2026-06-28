@@ -10,6 +10,7 @@ import {
 } from 'react-icons/fa';
 import financeAdminApi from '../services/financeAdminApi.js';
 import adminApi from '../services/adminApi.js';
+import { apiClient } from '../services/api.js';
 
 const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')} VND`;
 
@@ -68,9 +69,20 @@ export default function AdminFinancePage() {
     alert('Đã sao chép mã giao dịch: ' + text);
   };
 
-  const handleFillPaymentId = (paymentId) => {
-    setSplitForm(prev => ({ ...prev, paymentId }));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleFillPaymentId = async (paymentId) => {
+    try {
+      const res = await apiClient.get(`/payments/${paymentId}`);
+      if (res.payment) {
+        setSplitForm({
+          paymentId: res.payment.id,
+          amount: res.payment.amount,
+          platformPercent: 10
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (error) {
+      alert('Không thể tải thông tin thanh toán: ' + error.message);
+    }
   };
 
   const handleFillBookingId = (booking) => {
