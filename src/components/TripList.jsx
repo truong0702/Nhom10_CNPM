@@ -12,6 +12,7 @@ export default function TripList({ trips, onProceedToCheckout }) {
     [trips]
   )
   const maxPrice = prices.length ? Math.max(...prices) : 0
+  const priceSliderMax = Math.max(100000, maxPrice)
   const [priceRange, setPriceRange] = useState(maxPrice)
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function TripList({ trips, onProceedToCheckout }) {
   const sortedTrips = useMemo(() => {
     return [...trips]
       .filter((trip) => Number(trip.price) <= priceRange)
-      .filter((trip) => !vehicleType || getVehicleType(trip.bus) === vehicleType)
+      .filter((trip) => !vehicleType || (trip.vehicleType || getVehicleType(trip.bus)) === vehicleType)
       .sort((a, b) => {
         if (sortBy === 'price') return Number(a.price) - Number(b.price)
         if (sortBy === 'departure') return String(a.departure).localeCompare(String(b.departure))
@@ -62,9 +63,9 @@ export default function TripList({ trips, onProceedToCheckout }) {
                   <input
                     type="range"
                     min={0}
-                    max={Math.max(100000, maxPrice)}
-                    step={50000}
-                    value={Math.min(priceRange, Math.max(100000, maxPrice))}
+                    max={priceSliderMax}
+                    step={1000}
+                    value={Math.min(priceRange, priceSliderMax)}
                     onChange={(event) => setPriceRange(Number(event.target.value))}
                     className="w-full accent-red-600"
                   />

@@ -35,8 +35,26 @@ const Booking = sequelize.define(
       type: DataTypes.BIGINT,
       allowNull: false,
     },
+    commissionRate: {
+      type: DataTypes.DECIMAL(5, 4),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Platform commission rate applied after payment is paid',
+    },
+    commissionAmount: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Platform commission amount in VND',
+    },
+    carrierRevenue: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Net amount paid to carrier after commission',
+    },
     paymentMethod: {
-      type: DataTypes.ENUM('bank_transfer', 'wallet', 'cash_at_station'),
+      type: DataTypes.ENUM('bank_transfer', 'wallet', 'cash_at_station', 'vnpay'),
       defaultValue: 'bank_transfer',
     },
     paymentStatus: {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaBus, FaChair, FaCheckCircle, FaClock, FaMapMarkerAlt, FaStar } from 'react-icons/fa'
 
@@ -8,12 +8,7 @@ export default function TripCard({ trip, onSelect, selected }) {
   const hour = Number.parseInt(String(trip.departure || '0').split(':')[0], 10)
   const timeCategory = getTimeCategory(Number.isFinite(hour) ? hour : 0)
 
-  const priceDiscount = useMemo(() => {
-    const seed = String(trip.id || trip.bus || '').split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0)
-    return seed % 12
-  }, [trip.id, trip.bus])
-
-  const discountedPrice = Math.round(Number(trip.price || 0) * (100 - priceDiscount) / 100)
+  const displayPrice = Number(trip.price || 0)
   const seatsAvailable = trip.seatsAvailable ?? trip.seats ?? 0
 
   return (
@@ -50,11 +45,6 @@ export default function TripCard({ trip, onSelect, selected }) {
             {timeCategory.label}
           </span>
 
-          {priceDiscount > 0 && (
-            <div className="absolute right-4 top-4 z-10 rounded-full bg-red-500 px-3 py-1 text-sm font-bold text-white shadow-lg">
-              -{priceDiscount}%
-            </div>
-          )}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between p-6">
@@ -70,13 +60,8 @@ export default function TripCard({ trip, onSelect, selected }) {
 
               <div className="shrink-0 lg:text-right">
                 <div className="whitespace-nowrap text-3xl font-black text-red-600 lg:text-4xl">
-                  {discountedPrice.toLocaleString('vi-VN')}đ
+                  {displayPrice.toLocaleString('vi-VN')}đ
                 </div>
-                {priceDiscount > 0 && (
-                  <p className="text-xs text-gray-400 line-through">
-                    {Number(trip.price || 0).toLocaleString('vi-VN')}đ
-                  </p>
-                )}
               </div>
             </div>
 

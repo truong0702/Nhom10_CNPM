@@ -75,7 +75,12 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        const message = (data && (data.error || data.message)) || 'API request failed';
+        const message =
+          (data && (data.error || data.message)) ||
+          (response.status === 409 ? 'Email da ton tai hoac da duoc su dung' : '') ||
+          (response.status === 400 ? 'Du lieu gui len khong hop le' : '') ||
+          (response.status === 403 ? 'Ban khong co quyen thuc hien thao tac nay' : '') ||
+          'API request failed';
         const error = new Error(message);
         error.status = response.status;
         error.data = data;

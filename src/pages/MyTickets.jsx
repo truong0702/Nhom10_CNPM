@@ -45,9 +45,9 @@ export default function MyTickets() {
   }, [user, navigate])
 
   const grouped = useMemo(() => {
-    const verified = bookings.filter((b) => b.payment?.status === 'verified' || b.paymentStatus === 'paid')
-    const pending = bookings.filter((b) => b.payment?.status === 'pending')
-    const failed = bookings.filter((b) => b.payment?.status === 'failed' || (b.paymentStatus === 'failed' && !b.payment))
+    const verified = bookings.filter((b) => getPaymentState(b) === 'paid')
+    const pending = bookings.filter((b) => getPaymentState(b) === 'pending')
+    const failed = bookings.filter((b) => getPaymentState(b) === 'failed')
     return { verified, pending, failed }
   }, [bookings])
 
@@ -59,7 +59,7 @@ export default function MyTickets() {
   if (!user) return null
 
   const canInteract = (booking) => {
-    const isPaid = booking.payment?.status === 'verified' || booking.paymentStatus === 'paid'
+    const isPaid = getPaymentState(booking) === 'paid'
     const isNotCanceled = booking.cancelStatus !== 'canceled'
     return isPaid && isNotCanceled
   }
@@ -216,7 +216,7 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange, onShowQR
     <div className={`rounded-xl border p-4 ${isCanceled ? 'bg-red-50' : 'bg-slate-50'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-bold text-gray-900">Mã vé: #{booking.id}</div>
+          <div className="font-bold text-gray-900">Mã vé: #{booking.ticketCode || booking.id}</div>
           <div className="mt-1 text-xs text-slate-500">{formatDateTime(booking.createdAt)}</div>
           {isCanceled && (
             <div className="mt-2 text-xs font-semibold text-red-600">
@@ -244,7 +244,7 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange, onShowQR
         </div>
       </div>
 
-      {booking.payment?.status === 'pending' && (
+      {getPaymentState(booking) === 'pending' && (
         <Notice tone="amber" title="Chờ xác nhận thanh toán">
           Thanh toán của bạn đã được ghi nhận. Admin sẽ xác nhận trong vòng 24h.
           Bạn sẽ không thể hủy/đổi vé cho tới khi thanh toán được xác nhận.
@@ -254,7 +254,7 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange, onShowQR
         </Notice>
       )}
 
-      {booking.payment?.status === 'failed' && (
+      {getPaymentState(booking) === 'failed' && (
         <Notice tone="red" title="Thanh toán thất bại">
           Thanh toán của bạn đã bị từ chối. Vui lòng liên hệ admin hoặc thử lại.
         </Notice>
@@ -273,7 +273,7 @@ function TicketCard({ booking, canInteract, busy, onCancel, onExchange, onShowQR
 
       {(canInteract || expanded) && !isCanceled && (
         <div className="mt-4">
-          {!canInteract && booking.payment?.status === 'pending' && (
+          {!canInteract && getPaymentState(booking) === 'pending' && (
             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
               Vui lòng chờ admin xác nhận thanh toán trước khi hủy/đổi vé.
             </div>
@@ -392,25 +392,20 @@ function PriceRow({ label, value, tone = 'default', strong = false }) {
 }
 
 function getStatusLabel(booking) {
-  if (booking.payment) {
-    if (booking.payment.status === 'verified') {
-      return { text: 'Đã thanh toán', cls: 'border-green-200 bg-green-50 text-green-700' }
-    }
-    if (booking.payment.status === 'pending') {
-      return { text: 'Chờ xác nhận thanh toán', cls: 'border-amber-200 bg-amber-50 text-amber-700' }
-    }
-    if (booking.payment.status === 'failed') {
-      return { text: 'Thanh toán thất bại', cls: 'border-red-200 bg-red-50 text-red-700' }
-    }
-  }
-
-  if (booking.paymentStatus === 'paid') {
+  const state = getPaymentState(booking)
+  if (state === 'paid') {
     return { text: 'Đã thanh toán', cls: 'border-green-200 bg-green-50 text-green-700' }
   }
-  if (booking.paymentStatus === 'processing' || booking.paymentStatus === 'pending') {
-    return { text: 'Đang xử lý', cls: 'border-amber-200 bg-amber-50 text-amber-700' }
+  if (state === 'pending') {
+    return { text: 'Chờ xác nhận thanh toán', cls: 'border-amber-200 bg-amber-50 text-amber-700' }
   }
-  return { text: 'Chưa thanh toán', cls: 'border-red-200 bg-red-50 text-red-700' }
+  return { text: 'Thanh toán thất bại', cls: 'border-red-200 bg-red-50 text-red-700' }
+}
+
+function getPaymentState(booking) {
+  if (booking.paymentStatus === 'paid' || booking.payment?.status === 'verified') return 'paid'
+  if (booking.paymentStatus === 'failed' || booking.payment?.status === 'failed') return 'failed'
+  return 'pending'
 }
 
 function formatCurrency(value) {

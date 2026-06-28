@@ -8,9 +8,11 @@ const emptyForm = {
   to: '',
   departure: '',
   arrival: '',
+  arrivalDate: '',
   duration: '',
   date: '',
   bus: '',
+  vehicleType: 'sleeping',
   seats: 40,
   seatsAvailable: 40,
   price: 450000,
@@ -38,13 +40,18 @@ export default function CarrierPortal() {
     setLoading(true)
     setError('')
     try {
-      const [tripResponse, bookingResponse] = await Promise.all([
-        carrierApi.getTrips(),
-        carrierApi.getBookings(),
-      ])
-      setCarrier(tripResponse.carrier || bookingResponse.carrier || null)
+      const tripResponse = await carrierApi.getTrips()
+      setCarrier(tripResponse.carrier || null)
       setTrips(tripResponse.trips || [])
-      setBookings(bookingResponse.bookings || [])
+
+      try {
+        const bookingResponse = await carrierApi.getBookings()
+        setCarrier((current) => current || bookingResponse.carrier || null)
+        setBookings(bookingResponse.bookings || [])
+      } catch (bookingError) {
+        setBookings([])
+        setError(bookingError.message || 'Không thể tải danh sách vé đã đặt')
+      }
     } catch (err) {
       setError(err.message || 'Không thể tải dữ liệu nhà xe')
     } finally {
@@ -59,11 +66,15 @@ export default function CarrierPortal() {
   const stats = useMemo(() => {
     const paidBookings = bookings.filter((booking) => booking.paymentStatus === 'paid')
     const revenue = paidBookings.reduce((sum, booking) => sum + Number(booking.total || 0), 0)
+    const commission = paidBookings.reduce((sum, booking) => sum + getCommissionAmount(booking), 0)
+    const carrierRevenue = paidBookings.reduce((sum, booking) => sum + getCarrierRevenue(booking), 0)
     return {
       trips: trips.length,
       bookings: bookings.length,
       paid: paidBookings.length,
       revenue,
+      commission,
+      carrierRevenue,
     }
   }, [bookings, trips])
 
@@ -76,7 +87,9 @@ export default function CarrierPortal() {
   const setField = (field, value) => {
     setForm((prev) => {
       const next = { ...prev, [field]: value }
+      if (field === 'date' && !next.arrivalDate) next.arrivalDate = value
       if (field === 'seats' && !editingId) next.seatsAvailable = value
+      next.duration = calculateDuration(next.date, next.departure, next.arrivalDate, next.arrival)
       return next
     })
   }
@@ -88,9 +101,11 @@ export default function CarrierPortal() {
       to: trip.to || '',
       departure: trip.departure || '',
       arrival: trip.arrival || '',
-      duration: trip.duration || '',
+      arrivalDate: trip.arrivalDate || trip.date || '',
+      duration: trip.duration || calculateDuration(trip.date, trip.departure, trip.arrivalDate || trip.date, trip.arrival),
       date: trip.date || '',
       bus: trip.bus || '',
+      vehicleType: trip.vehicleType || 'sleeping',
       seats: trip.seats || 40,
       seatsAvailable: trip.seatsAvailable ?? trip.seats ?? 40,
       price: trip.price || 450000,
@@ -107,6 +122,7 @@ export default function CarrierPortal() {
     try {
       const payload = {
         ...form,
+        duration: calculateDuration(form.date, form.departure, form.arrivalDate, form.arrival),
         seats: Number(form.seats),
         seatsAvailable: Number(form.seatsAvailable),
         price: Number(form.price),
@@ -181,6 +197,7 @@ export default function CarrierPortal() {
         <>
           <TripForm
             form={form}
+            carrier={carrier}
             editingId={editingId}
             saving={saving}
             onSubmit={handleSubmit}
@@ -229,11 +246,13 @@ function Dashboard({ stats, carrier, loading }) {
     { label: 'Chuyến xe', value: stats.trips },
     { label: 'Vé đã đặt', value: stats.bookings },
     { label: 'Vé đã thanh toán', value: stats.paid },
-    { label: 'Doanh thu ghi nhận', value: formatCurrency(stats.revenue) },
+    { label: 'Doanh thu gộp', value: formatCurrency(stats.revenue) },
+    { label: 'Chiết khấu 10%', value: formatCurrency(stats.commission) },
+    { label: 'Nhà xe thực nhận', value: formatCurrency(stats.carrierRevenue) },
   ]
 
   return (
-    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
       {cards.map((card) => (
         <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-black uppercase tracking-wide text-slate-500">{card.label}</div>
@@ -241,7 +260,7 @@ function Dashboard({ stats, carrier, loading }) {
         </div>
       ))}
       {carrier?.status === 'inactive' && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-800 md:col-span-2 xl:col-span-4">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-800 md:col-span-2 xl:col-span-6">
           Nhà xe đang ở trạng thái không hoạt động. Vui lòng liên hệ admin để mở lại trước khi tạo chuyến mới.
         </div>
       )}
@@ -249,7 +268,9 @@ function Dashboard({ stats, carrier, loading }) {
   )
 }
 
-function TripForm({ form, editingId, saving, onSubmit, onReset, setField }) {
+function TripForm({ form, carrier, editingId, saving, onSubmit, onReset, setField }) {
+  const canManageTrips = Boolean(carrier?.approved && carrier?.status === 'active')
+
   return (
     <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -263,21 +284,34 @@ function TripForm({ form, editingId, saving, onSubmit, onReset, setField }) {
         </button>
       </div>
 
+      {!canManageTrips && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          Tài khoản nhà xe đang chờ admin duyệt. Sau khi được duyệt và kích hoạt, bạn mới có thể tạo chuyến xe.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Tên xe"><input value={form.bus} onChange={(e) => setField('bus', e.target.value)} required className={inputClass} /></Field>
+        <Field label="Loại xe">
+          <select value={form.vehicleType} onChange={(e) => setField('vehicleType', e.target.value)} required className={inputClass}>
+            <option value="sleeping">Xe giường nằm</option>
+            <option value="seating">Xe ghế ngồi</option>
+          </select>
+        </Field>
         <Field label="Điểm đi"><input value={form.from} onChange={(e) => setField('from', e.target.value)} required className={inputClass} /></Field>
         <Field label="Điểm đến"><input value={form.to} onChange={(e) => setField('to', e.target.value)} required className={inputClass} /></Field>
-        <Field label="Ngày chạy"><input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} required className={inputClass} /></Field>
+        <Field label="Ngày đi"><input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} required className={inputClass} /></Field>
+        <Field label="Ngày đến"><input type="date" value={form.arrivalDate} min={form.date || undefined} onChange={(e) => setField('arrivalDate', e.target.value)} required className={inputClass} /></Field>
         <Field label="Giờ khởi hành"><input type="time" value={form.departure} onChange={(e) => setField('departure', e.target.value)} required className={inputClass} /></Field>
         <Field label="Giờ đến"><input type="time" value={form.arrival} onChange={(e) => setField('arrival', e.target.value)} required className={inputClass} /></Field>
-        <Field label="Thời lượng"><input value={form.duration} onChange={(e) => setField('duration', e.target.value)} className={inputClass} placeholder="8h 30m" /></Field>
+        <Field label="Thời lượng"><input value={form.duration} readOnly className={`${inputClass} bg-slate-50 text-slate-500`} placeholder="Tự động tính" /></Field>
         <Field label="Giá vé"><input type="number" min="1000" step="1000" value={form.price} onChange={(e) => setField('price', e.target.value)} required className={inputClass} /></Field>
-        <Field label="Tổng ghế"><input type="number" min="1" value={form.seats} onChange={(e) => setField('seats', e.target.value)} required className={inputClass} /></Field>
+        <Field label="Số chỗ"><input type="number" min="1" value={form.seats} onChange={(e) => setField('seats', e.target.value)} required className={inputClass} /></Field>
         <Field label="Ghế còn trống"><input type="number" min="0" value={form.seatsAvailable} onChange={(e) => setField('seatsAvailable', e.target.value)} required className={inputClass} /></Field>
       </div>
 
       <div className="mt-5 flex justify-end">
-        <button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white hover:bg-red-700 disabled:opacity-60">
+        <button disabled={saving || !canManageTrips} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
           <FaSave />
           {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Tạo chuyến'}
         </button>
@@ -311,8 +345,14 @@ function TripTable({ trips, loading, onEdit, onDelete, onCancel, onStatusChange 
               <tr><td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có chuyến xe</td></tr>
             ) : trips.map((trip) => (
               <tr key={trip.id} className="border-t border-slate-100">
-                <td className="px-5 py-4"><div className="font-black">{trip.from} → {trip.to}</div><div className="text-xs text-slate-500">{trip.bus}</div></td>
-                <td className="px-5 py-4"><div className="font-bold">{trip.date}</div><div className="text-xs text-slate-500">{trip.departure} - {trip.arrival}</div></td>
+                <td className="px-5 py-4">
+                  <div className="font-black">{trip.from} → {trip.to}</div>
+                  <div className="text-xs text-slate-500">{trip.bus} · {getVehicleTypeLabel(trip.vehicleType)}</div>
+                </td>
+                <td className="px-5 py-4">
+                  <div className="font-bold">{trip.date}{trip.arrivalDate && trip.arrivalDate !== trip.date ? ` → ${trip.arrivalDate}` : ''}</div>
+                  <div className="text-xs text-slate-500">{trip.departure} - {trip.arrival} · {trip.duration}</div>
+                </td>
                 <td className="px-5 py-4">{trip.seatsAvailable}/{trip.seats}</td>
                 <td className="px-5 py-4">
                   <select
@@ -365,20 +405,24 @@ function BookingTable({ bookings, loading }) {
               <th className="px-5 py-3">Chuyến</th>
               <th className="px-5 py-3">Thanh toán</th>
               <th className="px-5 py-3">Tổng</th>
+              <th className="px-5 py-3">Chiết khấu</th>
+              <th className="px-5 py-3">Nhà xe nhận</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td></tr>
             ) : bookings.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có vé</td></tr>
+              <tr><td colSpan={7} className="px-5 py-10 text-center font-bold text-slate-500">Chưa có vé</td></tr>
             ) : bookings.map((booking) => (
               <tr key={booking.id} className="border-t border-slate-100">
                 <td className="px-5 py-4 font-mono text-xs">{booking.id}</td>
                 <td className="px-5 py-4"><div className="font-bold">{booking.User?.fullName || '-'}</div><div className="text-xs text-slate-500">{booking.User?.email}</div></td>
                 <td className="px-5 py-4">{booking.Trip?.from} → {booking.Trip?.to}</td>
-                <td className="px-5 py-4">{booking.paymentStatus}</td>
+                <td className="px-5 py-4">{getPaymentStatusLabel(booking.paymentStatus)}</td>
                 <td className="px-5 py-4 font-black text-red-600">{formatCurrency(booking.total)}</td>
+                <td className="px-5 py-4 font-bold text-slate-700">{booking.paymentStatus === 'paid' ? formatCurrency(getCommissionAmount(booking)) : '-'}</td>
+                <td className="px-5 py-4 font-black text-emerald-700">{booking.paymentStatus === 'paid' ? formatCurrency(getCarrierRevenue(booking)) : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -407,4 +451,38 @@ function getStatusClass(status = 'active') {
   if (status === 'cancelled') return 'border-red-100 bg-red-50 text-red-700'
   if (status === 'inactive') return 'border-amber-100 bg-amber-50 text-amber-700'
   return 'border-emerald-100 bg-emerald-50 text-emerald-700'
+}
+
+function calculateDuration(date, departure, arrivalDate, arrival) {
+  if (!date || !departure || !arrivalDate || !arrival) return ''
+  const start = new Date(`${date}T${departure}`)
+  const end = new Date(`${arrivalDate}T${arrival}`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return ''
+
+  const totalMinutes = Math.round((end - start) / 60000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`
+}
+
+function getVehicleTypeLabel(vehicleType) {
+  return vehicleType === 'sleeping' ? 'Xe giường nằm' : 'Xe ghế ngồi'
+}
+
+function getPaymentStatusLabel(status) {
+  if (status === 'paid') return 'Đã thanh toán'
+  if (status === 'failed') return 'Thanh toán thất bại'
+  return 'Chờ xác nhận'
+}
+
+function getCommissionAmount(booking) {
+  if (booking.paymentStatus !== 'paid') return 0
+  const total = Number(booking.total || 0)
+  return Number(booking.commissionAmount || Math.round(total * 0.1))
+}
+
+function getCarrierRevenue(booking) {
+  if (booking.paymentStatus !== 'paid') return 0
+  const total = Number(booking.total || 0)
+  return Number(booking.carrierRevenue || Math.max(total - getCommissionAmount(booking), 0))
 }

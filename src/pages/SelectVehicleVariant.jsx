@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../services/api'
 
-// Step 2: chọn loại xe và biến thể
+// Step 2: chọn hạng ghế theo loại xe của chuyến.
 export default function SelectVehicleVariant() {
   const { tripId } = useParams()
   const navigate = useNavigate()
@@ -11,9 +11,9 @@ export default function SelectVehicleVariant() {
   const [trip, setTrip] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  const vehicleTypeFromState = location.state?.vehicleType || ''
   const [vehicleVariant, setVehicleVariant] = useState('')
+
+  const vehicleType = location.state?.vehicleType || trip?.vehicleType || getVehicleType(trip?.bus)
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -23,7 +23,7 @@ export default function SelectVehicleVariant() {
         setTrip(response.data)
         setError('')
       } catch (err) {
-        setError(err.message || 'Failed to fetch trip')
+        setError(err.message || 'Không thể tải chuyến xe')
         setTrip(null)
       } finally {
         setLoading(false)
@@ -35,34 +35,25 @@ export default function SelectVehicleVariant() {
     }
   }, [tripId])
 
-  useEffect(() => {
-    if (!vehicleTypeFromState) {
-      // nếu user refresh state, quay lại step 1
-      navigate(`/trip/${tripId}/select-vehicle-type`, { replace: true })
-    }
-  }, [vehicleTypeFromState, navigate, tripId])
-
   const options = useMemo(() => {
-    if (vehicleTypeFromState === 'sleeping') {
+    if (vehicleType === 'sleeping') {
       return [
-        { id: 'standard', label: 'Tiêu chuẩn (dưới)' },
-        { id: 'vip', label: 'VIP (trên)' },
+        { id: 'standard', label: 'Giường nằm tiêu chuẩn' },
+        { id: 'vip', label: 'Giường nằm VIP' },
       ]
     }
-    if (vehicleTypeFromState === 'seating') {
-      return [
-        { id: 'standard', label: 'Tiêu chuẩn' },
-        { id: 'comfort', label: 'Ghế êm (comfort)' },
-      ]
-    }
-    return []
-  }, [vehicleTypeFromState])
+
+    return [
+      { id: 'standard', label: 'Ghế ngồi tiêu chuẩn' },
+      { id: 'comfort', label: 'Ghế ngồi êm' },
+    ]
+  }, [vehicleType])
 
   const onContinue = () => {
     if (!vehicleVariant) return
     navigate(`/trip/${tripId}/select-seat`, {
       state: {
-        vehicleType: vehicleTypeFromState,
+        vehicleType,
         vehicleVariant,
       },
     })
@@ -79,7 +70,7 @@ export default function SelectVehicleVariant() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto p-4">
-        <div className="border rounded-2xl bg-white p-6 shadow-sm text-sm text-red-600">Error loading trip: {error}</div>
+        <div className="border rounded-2xl bg-white p-6 shadow-sm text-sm text-red-600">Lỗi tải chuyến xe: {error}</div>
       </div>
     )
   }
@@ -87,7 +78,7 @@ export default function SelectVehicleVariant() {
   if (!trip) {
     return (
       <div className="max-w-3xl mx-auto p-4">
-        <div className="border rounded-2xl bg-white p-6 shadow-sm text-sm text-slate-600">Trip not found.</div>
+        <div className="border rounded-2xl bg-white p-6 shadow-sm text-sm text-slate-600">Không tìm thấy chuyến xe.</div>
       </div>
     )
   }
@@ -95,14 +86,14 @@ export default function SelectVehicleVariant() {
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <div className="border rounded-2xl bg-white p-4 shadow-sm">
-        <div className="text-sm text-slate-500">Step 2</div>
-        <h2 className="text-2xl font-bold">Chọn loại xe (biến thể)</h2>
+        <div className="text-sm text-slate-500">Bước 2</div>
+        <h2 className="text-2xl font-bold">Chọn hạng ghế</h2>
         <p className="text-sm text-slate-600 mt-1">{trip.bus}</p>
       </div>
 
       <div className="border rounded-2xl bg-white p-4 shadow-sm space-y-3">
-        <h3 className="font-black text-gray-900">Chọn biến thể</h3>
-        <p className="text-sm text-slate-600">Đây là bước chọn loại xe và biến thể.</p>
+        <h3 className="font-black text-gray-900">Chọn hạng ghế</h3>
+        <p className="text-sm text-slate-600">Loại xe đã được nhà xe cấu hình cho chuyến này: {getVehicleTypeLabel(vehicleType)}.</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {options.map((opt) => (
@@ -146,3 +137,13 @@ export default function SelectVehicleVariant() {
   )
 }
 
+function getVehicleType(bus = '') {
+  const text = String(bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  if (text.includes('giuong') || text.includes('limousine') || text.includes('sleeper')) return 'sleeping'
+  if (text.includes('ghe') || text.includes('ngoi') || text.includes('seat')) return 'seating'
+  return 'seating'
+}
+
+function getVehicleTypeLabel(vehicleType) {
+  return vehicleType === 'sleeping' ? 'Xe giường nằm' : 'Xe ghế ngồi'
+}

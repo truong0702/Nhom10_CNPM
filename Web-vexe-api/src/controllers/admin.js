@@ -28,6 +28,37 @@ const loadUserMap = async (userIds = []) => {
   return new Map(users.map((user) => [user.id, user]));
 };
 
+const withRevenueFields = (booking) => {
+  const plain = booking.get ? booking.get({ plain: true }) : { ...booking };
+  const total = Number(plain.total || 0);
+  const isPaid = plain.paymentStatus === 'paid';
+  const commissionRate = isPaid ? Number(plain.commissionRate || 0.1) : 0;
+  const commissionAmount = isPaid ? Number(plain.commissionAmount || Math.round(total * commissionRate)) : 0;
+  const carrierRevenue = isPaid ? Number(plain.carrierRevenue || Math.max(total - commissionAmount, 0)) : 0;
+  return {
+    ...plain,
+    commissionRate,
+    commissionAmount,
+    carrierRevenue,
+  };
+};
+
+const withTripItemDescriptions = (plainBooking) => {
+  const trip = plainBooking.trip || plainBooking.Trip;
+  if (!trip?.from || !trip?.to || !Array.isArray(plainBooking.items)) {
+    return plainBooking;
+  }
+
+  const description = `${trip.from} -> ${trip.to}`;
+  return {
+    ...plainBooking,
+    items: plainBooking.items.map((item) => ({
+      ...item,
+      description: item.description && !/[\uFFFD?]/.test(item.description) ? item.description : description,
+    })),
+  };
+};
+
 export const getUsers = async (req, res) => {
   try {
     const users = await User.findAll({ order: [['createdAt', 'DESC']] });
@@ -108,18 +139,56 @@ export const createCarrier = async (req, res) => {
     const { name, email, phone, address, approved = false, status = 'active', rating, reviews } = req.body;
     if (!name) return res.status(400).json({ error: 'Carrier name is required' });
 
+    const normalizedEmail = email?.trim() || null;
+    let ownerUser = null;
+
+    if (normalizedEmail) {
+      const existingCarrier = await Carrier.findOne({ where: { email: normalizedEmail } });
+      if (existingCarrier) return res.status(409).json({ error: 'Carrier email already exists' });
+
+      ownerUser = await User.findOne({ where: { email: normalizedEmail } });
+      if (ownerUser && ownerUser.role !== 'carrier') {
+        return res.status(409).json({ error: 'Email already belongs to a non-carrier user' });
+      }
+
+      if (!ownerUser) {
+        ownerUser = await User.create({
+          email: normalizedEmail,
+          password: await bcrypt.hash('123456', 10),
+          fullName: name,
+          phone: phone || null,
+          role: 'carrier',
+          isVerified: Boolean(approved),
+        });
+      } else {
+        await ownerUser.update({
+          fullName: ownerUser.fullName || name,
+          phone: phone || ownerUser.phone,
+          role: 'carrier',
+          isVerified: Boolean(approved) || ownerUser.isVerified,
+        });
+      }
+    }
+
     const carrier = await Carrier.create({
       name,
-      email: email || null,
+      email: normalizedEmail,
       phone: phone || null,
       address: address || null,
+      ownerUserId: ownerUser?.id || null,
       approved: Boolean(approved),
       status,
       rating: rating ?? 4.5,
       reviews: reviews ?? 0,
     });
 
-    return res.status(201).json({ message: 'Carrier created successfully', carrier });
+    return res.status(201).json({
+      message: ownerUser
+        ? 'Carrier and login account created successfully. Default password is 123456.'
+        : 'Carrier created successfully',
+      carrier,
+      owner: ownerUser ? sanitizeUser(ownerUser, null) : null,
+    });
   } catch (error) {
     console.error('Failed to create carrier:', error);
     return res.status(500).json({ error: error.message });
@@ -237,15 +306,19 @@ const normalizeTripPayload = (payload = {}, existingTrip = null) => {
         ? Math.min(Number(existingTrip.seatsAvailable), Number(seats || existingTrip.seats))
         : Number(seats);
 
+  const arrivalDate = payload.arrivalDate || payload.date;
+
   return {
     carrierId: payload.carrierId,
     from: payload.from?.trim(),
     to: payload.to?.trim(),
     departure: payload.departure,
     arrival: payload.arrival,
-    duration: payload.duration || null,
     date: payload.date,
+    arrivalDate,
+    duration: calculateDuration(payload.date, payload.departure, arrivalDate, payload.arrival) || payload.duration || null,
     bus: payload.bus?.trim(),
+    vehicleType: payload.vehicleType || existingTrip?.vehicleType || 'seating',
     seats,
     seatsAvailable,
     price: payload.price !== undefined ? Number(payload.price) : existingTrip?.price,
@@ -256,11 +329,27 @@ const normalizeTripPayload = (payload = {}, existingTrip = null) => {
   };
 };
 
+const calculateDuration = (date, departure, arrivalDate, arrival) => {
+  if (!date || !departure || !arrival) return null;
+  const start = new Date(`${date}T${departure}`);
+  const end = new Date(`${arrivalDate || date}T${arrival}`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+
+  const totalMinutes = Math.round((end - start) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+};
+
 const validateTripPayload = (payload) => {
-  const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'bus'];
+  const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'arrivalDate', 'bus', 'vehicleType'];
   for (const field of required) {
     if (!payload[field]) return `${field} is required`;
   }
+  if (!calculateDuration(payload.date, payload.departure, payload.arrivalDate, payload.arrival)) {
+    return 'arrival time must be after departure time';
+  }
+  if (!['sleeping', 'seating'].includes(payload.vehicleType)) return 'vehicleType is invalid';
   if (!Number.isFinite(payload.seats) || payload.seats <= 0) return 'seats must be greater than 0';
   if (!Number.isFinite(payload.seatsAvailable) || payload.seatsAvailable < 0) return 'seatsAvailable must be 0 or greater';
   if (payload.seatsAvailable > payload.seats) return 'seatsAvailable cannot exceed seats';
@@ -347,12 +436,12 @@ export const getBookings = async (req, res) => {
 
     return res.json({
       bookings: bookings.map((booking) => {
-        const plain = booking.get({ plain: true });
-        return {
+        const plain = withRevenueFields(booking);
+        return withTripItemDescriptions({
           ...plain,
           user: userMap.get(booking.userId) ? sanitizeUser(userMap.get(booking.userId), null) : null,
           trip: tripMap.get(booking.tripId) || null,
-        };
+        });
       }),
     });
   } catch (error) {

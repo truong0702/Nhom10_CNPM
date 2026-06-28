@@ -233,6 +233,8 @@ const startServer = async () => {
   try {
     // Test database connection
     await sequelize.authenticate();
+    await sequelize.query("ALTER TYPE \"enum_bookings_paymentMethod\" ADD VALUE IF NOT EXISTS 'vnpay';").catch(() => {});
+    await sequelize.query("ALTER TYPE \"enum_payments_paymentMethod\" ADD VALUE IF NOT EXISTS 'vnpay';").catch(() => {});
     console.log('✓ Database connected successfully');
 
     // Sync models

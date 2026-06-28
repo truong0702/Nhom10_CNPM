@@ -1,4 +1,5 @@
 import { Booking, Carrier, Trip, User } from '../models/index.js';
+import { Op } from 'sequelize';
 
 const sanitizeUser = (user) => {
   if (!user) return null;
@@ -23,7 +24,45 @@ const requireOwnedCarrier = async (req, res) => {
   return carrier;
 };
 
-export const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
+const calculateDuration = (date, departure, arrivalDate, arrival) => {
+  if (!date || !departure || !arrival) return null;
+  const start = new Date(`${date}T${departure}`);
+  const end = new Date(`${arrivalDate || date}T${arrival}`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
+
+  const totalMinutes = Math.round((end - start) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+};
+
+const withCarrierRevenue = (booking) => {
+  const plain = booking.get ? booking.get({ plain: true }) : { ...booking };
+  const total = Number(plain.total || 0);
+  const isPaid = plain.paymentStatus === 'paid';
+  const commissionRate = isPaid ? Number(plain.commissionRate || 0.1) : 0;
+  const commissionAmount = isPaid ? Number(plain.commissionAmount || Math.round(total * commissionRate)) : 0;
+  const carrierRevenue = isPaid ? Number(plain.carrierRevenue || Math.max(total - commissionAmount, 0)) : 0;
+  const result = {
+    ...plain,
+    commissionRate,
+    commissionAmount,
+    carrierRevenue,
+  };
+
+  const trip = result.Trip || result.trip;
+  if (trip?.from && trip?.to && Array.isArray(result.items)) {
+    const description = `${trip.from} -> ${trip.to}`;
+    result.items = result.items.map((item) => ({
+      ...item,
+      description: item.description && !/[\uFFFD?]/.test(item.description) ? item.description : description,
+    }));
+  }
+
+  return result;
+};
+
+const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
   const seats = payload.seats !== undefined ? Number(payload.seats) : existingTrip?.seats;
   const seatsAvailable =
     payload.seatsAvailable !== undefined
@@ -38,9 +77,11 @@ export const normalizeTripPayload = (payload = {}, carrierId, existingTrip = nul
     to: payload.to?.trim(),
     departure: payload.departure,
     arrival: payload.arrival,
-    duration: payload.duration || null,
     date: payload.date,
+    arrivalDate: payload.arrivalDate || payload.date,
+    duration: calculateDuration(payload.date, payload.departure, payload.arrivalDate || payload.date, payload.arrival) || payload.duration || null,
     bus: payload.bus?.trim(),
+    vehicleType: payload.vehicleType || existingTrip?.vehicleType || 'seating',
     seats,
     seatsAvailable,
     price: payload.price !== undefined ? Number(payload.price) : existingTrip?.price,
@@ -51,11 +92,15 @@ export const normalizeTripPayload = (payload = {}, carrierId, existingTrip = nul
   };
 };
 
-export const validateTripPayload = (payload) => {
-  const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'bus'];
+const validateTripPayload = (payload) => {
+  const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'arrivalDate', 'bus', 'vehicleType'];
   for (const field of required) {
     if (!payload[field]) return `${field} is required`;
   }
+  if (!calculateDuration(payload.date, payload.departure, payload.arrivalDate, payload.arrival)) {
+    return 'arrival time must be after departure time';
+  }
+  if (!['sleeping', 'seating'].includes(payload.vehicleType)) return 'vehicleType is invalid';
   if (!Number.isFinite(payload.seats) || payload.seats <= 0) return 'seats must be greater than 0';
   if (!Number.isFinite(payload.seatsAvailable) || payload.seatsAvailable < 0) return 'seatsAvailable must be 0 or greater';
   if (payload.seatsAvailable > payload.seats) return 'seatsAvailable cannot exceed seats';
@@ -100,7 +145,7 @@ export const createCarrierTrip = async (req, res) => {
     const carrier = await requireOwnedCarrier(req, res);
     if (!carrier) return;
     if (!carrier.approved || carrier.status !== 'active') {
-      return res.status(403).json({ error: 'Carrier must be approved and active before creating trips' });
+      return res.status(403).json({ error: 'Tai khoan nha xe dang cho admin duyet hoac chua duoc kich hoat' });
     }
 
     const payload = normalizeTripPayload(req.body, carrier.id);
@@ -245,8 +290,8 @@ export const getCarrierBookings = async (req, res) => {
     const trips = await Trip.findAll({ where: { carrierId: carrier.id }, attributes: ['id'] });
     const tripIds = trips.map((trip) => trip.id);
 
-    const bookings = await Booking.findAll({
-      where: { tripId: tripIds },
+    const bookings = tripIds.length === 0 ? [] : await Booking.findAll({
+      where: { tripId: { [Op.in]: tripIds } },
       include: [
         { model: Trip },
         { model: User, attributes: ['id', 'email', 'fullName', 'phone'] },
@@ -254,7 +299,7 @@ export const getCarrierBookings = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    return res.json({ carrier, bookings });
+    return res.json({ carrier, bookings: bookings.map(withCarrierRevenue) });
   } catch (error) {
     console.error('Carrier bookings error:', error);
     return res.status(500).json({ error: error.message });

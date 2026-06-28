@@ -21,6 +21,23 @@ export const paymentApi = {
   },
 
   /**
+   * Create VNPay payment URL
+   */
+  async createVnpayPayment(bookingId, amount) {
+    return await apiClient.post('/payments/vnpay', {
+      bookingId,
+      amount,
+    });
+  },
+
+  /**
+   * Verify VNPay return query
+   */
+  async verifyVnpayReturn(params) {
+    return await apiClient.get('/payments/vnpay/return', { params });
+  },
+
+  /**
    * Get payment details
    */
   async getPaymentDetails(paymentId) {

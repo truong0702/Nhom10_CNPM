@@ -1,4 +1,57 @@
 import { Booking, Trip, User, Wallet, Payment } from '../models/index.js';
+import { sendBookingConfirmation } from '../utils/mailer.js';
+
+const CARRIER_COMMISSION_RATE = 0.1;
+
+const getTicketCode = (bookingId) => `VE-${String(bookingId || '').slice(0, 8).toUpperCase()}`;
+
+const getSelectedSeatLabels = (items) => (Array.isArray(items) ? items : [])
+  .flatMap((item) => item.selectedSeatLabels || item.selectedSeats || [])
+  .map((label) => String(label));
+
+const getSeatCount = (items) => {
+  if (!Array.isArray(items)) return 1;
+  return items.reduce((sum, item) => {
+    const selectedSeats = item.selectedSeatLabels || item.selectedSeats || [];
+    return sum + Number(item.seats || selectedSeats.length || item.qty || 1);
+  }, 0);
+};
+
+const getPaymentMethodLabel = (paymentMethod) => {
+  if (paymentMethod === 'wallet') return 'Vi VeXe';
+  if (paymentMethod === 'cash_at_station') return 'Thanh toan tai quay';
+  return 'Chuyen khoan ngan hang';
+};
+
+const applyCarrierCommission = (booking) => {
+  const total = Number(booking.total || 0);
+  const commissionAmount = Math.round(total * CARRIER_COMMISSION_RATE);
+  booking.commissionRate = CARRIER_COMMISSION_RATE;
+  booking.commissionAmount = commissionAmount;
+  booking.carrierRevenue = Math.max(total - commissionAmount, 0);
+};
+
+const clearCarrierCommission = (booking) => {
+  booking.commissionRate = 0;
+  booking.commissionAmount = 0;
+  booking.carrierRevenue = 0;
+};
+
+const withTripItemDescriptions = (plainBooking) => {
+  const trip = plainBooking.Trip || plainBooking.trip;
+  if (!trip?.from || !trip?.to || !Array.isArray(plainBooking.items)) {
+    return plainBooking;
+  }
+
+  const description = `${trip.from} -> ${trip.to}`;
+  return {
+    ...plainBooking,
+    items: plainBooking.items.map((item) => ({
+      ...item,
+      description: item.description && !/[\uFFFD?]/.test(item.description) ? item.description : description,
+    })),
+  };
+};
 
 // Helper functions
 const getWalletBalance = async (userId) => {
@@ -109,17 +162,47 @@ export const createBooking = async (req, res) => {
 
     // Add to history
     if (!booking.history) booking.history = [];
+    const ticketCode = getTicketCode(booking.id);
     booking.history.push({
       event: 'BOOKING_CREATED',
       timestamp: new Date(),
       seats: totalSeats,
       total: booking.total,
+      ticketCode,
     });
     await booking.save();
 
+    const user = await User.findByPk(userId, {
+      attributes: ['email', 'fullName'],
+    });
+
+    if (user?.email) {
+      try {
+        await sendBookingConfirmation(user.email, {
+          ticketCode,
+          fullName: user.fullName,
+          from: trip.from,
+          to: trip.to,
+          date: trip.date,
+          departure: trip.departure,
+          arrival: trip.arrival,
+          bus: trip.bus,
+          seats: getSelectedSeatLabels(bookingItems),
+          seatCount: getSeatCount(bookingItems),
+          total: totalAmount,
+          paymentMethod: getPaymentMethodLabel(booking.paymentMethod),
+        });
+      } catch (emailError) {
+        console.error('Failed to send booking confirmation email:', emailError);
+      }
+    }
+
     return res.status(201).json({
       message: 'Booking created successfully',
-      booking,
+      booking: {
+        ...booking.toJSON(),
+        ticketCode,
+      },
       trip: {
         id: trip.id,
         seatsRemaining: trip.seatsAvailable,
@@ -371,8 +454,10 @@ export const getBookings = async (req, res) => {
           where: { bookingId: booking.id },
           order: [['createdAt', 'DESC']],
         });
+        const plainBooking = withTripItemDescriptions(booking.toJSON());
         return {
-          ...booking.toJSON(),
+          ...plainBooking,
+          ticketCode: getTicketCode(booking.id),
           payment: payment ? {
             id: payment.id,
             status: payment.status,
@@ -413,7 +498,8 @@ export const getBooking = async (req, res) => {
 
     return res.json({
       booking: {
-        ...booking.toJSON(),
+        ...withTripItemDescriptions(booking.toJSON()),
+        ticketCode: getTicketCode(booking.id),
         payment: payment ? {
           id: payment.id,
           status: payment.status,
@@ -449,11 +535,42 @@ export const updateBookingPaymentStatus = async (req, res) => {
     }
 
     booking.paymentStatus = status;
+    if (status === 'paid') {
+      applyCarrierCommission(booking);
+    } else {
+      clearCarrierCommission(booking);
+    }
+
+    const latestPayment = await Payment.findOne({
+      where: { bookingId: booking.id },
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (latestPayment) {
+      if (status === 'paid') {
+        latestPayment.status = 'verified';
+        latestPayment.verifiedBy = req.user.role === 'admin' ? req.user.id : latestPayment.verifiedBy;
+        latestPayment.verifiedAt = latestPayment.verifiedAt || new Date();
+      } else if (status === 'failed') {
+        latestPayment.status = 'failed';
+        latestPayment.verifiedBy = req.user.role === 'admin' ? req.user.id : latestPayment.verifiedBy;
+        latestPayment.verifiedAt = latestPayment.verifiedAt || new Date();
+      } else {
+        latestPayment.status = 'pending';
+        latestPayment.verifiedBy = null;
+        latestPayment.verifiedAt = null;
+      }
+      await latestPayment.save();
+    }
 
     if (!booking.history) booking.history = [];
     booking.history.push({
       event: 'PAYMENT_STATUS_UPDATED',
       newStatus: status,
+      paymentStatus: latestPayment?.status || null,
+      commissionRate: booking.commissionRate,
+      commissionAmount: booking.commissionAmount,
+      carrierRevenue: booking.carrierRevenue,
       timestamp: new Date(),
     });
 

@@ -4,6 +4,9 @@ dist/
 .env.local
 .vite/
 *.log
+tmp/
+srs_render/
+SRS_WebVexe_working.docx
 .DS_Store
 /.idea
 .vscode

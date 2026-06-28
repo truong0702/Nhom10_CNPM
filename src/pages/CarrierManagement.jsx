@@ -261,6 +261,11 @@ export default function CarrierManagement() {
                 <p className="text-sm font-semibold text-slate-500">
                   Nhà xe đăng ký từ trang public sẽ có tài khoản chủ sở hữu đi kèm.
                 </p>
+                {!editingId && (
+                  <p className="mt-1 text-xs font-bold text-amber-700">
+                    Mat khau mac dinh cho tai khoan nha xe moi: 123456.
+                  </p>
+                )}
               </div>
               <button
                 type="button"

@@ -116,6 +116,18 @@ export default function Checkout({ cartItems, total, onUpdateQty, onClear }) {
     }
 
     // Nếu là bank transfer, tạo payment record
+    if (paymentMethod === 'vnpay') {
+      try {
+        const response = await paymentApi.createVnpayPayment(booking.id, Number(payableTotal))
+        window.location.href = response.paymentUrl
+        return
+      } catch (err) {
+        setPayStatus('failed')
+        setErrorMsg(err?.message || 'Không thể tạo thanh toán VNPay. Vui lòng thử lại sau.')
+        return
+      }
+    }
+
     if (paymentMethod === 'bank_transfer') {
       try {
         const response = await paymentApi.createBankTransferPayment(
@@ -335,6 +347,7 @@ export default function Checkout({ cartItems, total, onUpdateQty, onClear }) {
               <div className="text-sm font-bold text-slate-700 mb-2">Phương thức thanh toán</div>
               <div className="space-y-2">
                 {[
+                  { id: 'vnpay', label: 'VNPay' },
                   { id: 'bank_transfer', label: '🏦 Chuyển khoản' },
                   { id: 'wallet', label: '💰 Ví của tôi' },
                   { id: 'cash_at_station', label: '💵 Thanh toán tại trạm' },
@@ -376,6 +389,8 @@ export default function Checkout({ cartItems, total, onUpdateQty, onClear }) {
                 <span className="font-bold">
                   {paymentMethod === 'bank_transfer'
                     ? 'Chuyển khoản'
+                    : paymentMethod === 'vnpay'
+                    ? 'VNPay'
                     : paymentMethod === 'wallet'
                     ? 'Ví'
                     : 'Tại trạm'}

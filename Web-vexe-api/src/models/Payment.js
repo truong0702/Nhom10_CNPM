@@ -28,7 +28,7 @@ const Payment = sequelize.define(
       },
     },
     paymentMethod: {
-      type: DataTypes.ENUM('bank_transfer', 'wallet', 'cash_at_station'),
+      type: DataTypes.ENUM('bank_transfer', 'wallet', 'cash_at_station', 'vnpay'),
       defaultValue: 'bank_transfer',
     },
     amount: {

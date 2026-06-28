@@ -46,7 +46,7 @@ export default function Register() {
       await register(email.trim(), password, fullName.trim(), phone)
       navigate('/')
     } catch (err) {
-      setError(err.message)
+      setError(getRegisterErrorMessage(err, mode))
     } finally {
       setLoading(false)
     }
@@ -194,6 +194,18 @@ export default function Register() {
       </div>
     </div>
   )
+}
+
+function getRegisterErrorMessage(error, mode) {
+  const message = error?.message || ''
+  if (error?.status === 409) {
+    if (mode === 'carrier') {
+      return message || 'Email nay da ton tai. Vui long dung email khac hoac dung dung mat khau cua tai khoan hien co.'
+    }
+    return message || 'Email nay da duoc dang ky. Vui long dung email khac.'
+  }
+
+  return message || 'Khong the dang ky. Vui long kiem tra lai thong tin.'
 }
 
 function TextField({

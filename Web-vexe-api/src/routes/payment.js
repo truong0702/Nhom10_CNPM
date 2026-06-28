@@ -2,11 +2,14 @@ import express from 'express';
 import {
   getBankInfo,
   createBankTransferPayment,
+  createVnpayPayment,
   getPaymentDetails,
   verifyBankTransfer,
   rejectBankTransfer,
   getPendingBankTransfers,
   getPaymentsAdmin,
+  handleVnpayReturn,
+  handleVnpayIpn,
 } from '../controllers/payment.js';
 import { authenticateToken, authorize } from '../middleware/auth.js';
 
@@ -20,9 +23,12 @@ router.post('/admin/:paymentId/reject', authenticateToken, authorize('admin'), r
 
 // Public routes
 router.get('/bank-info', getBankInfo);
+router.get('/vnpay/return', handleVnpayReturn);
+router.get('/vnpay/ipn', handleVnpayIpn);
 
 // User routes (authenticated)
 router.post('/bank-transfer', authenticateToken, createBankTransferPayment);
+router.post('/vnpay', authenticateToken, createVnpayPayment);
 router.get('/:paymentId', authenticateToken, getPaymentDetails);
 
 export default router;

@@ -21,7 +21,7 @@ export const getTrips = async (req, res) => {
     });
     const filteredTrips = trips.filter((trip) => {
       if (timeOfDay && getTimeOfDay(trip.departure) !== timeOfDay) return false;
-      if (vehicleType && getVehicleType(trip.bus) !== vehicleType) return false;
+      if (vehicleType && (trip.vehicleType || getVehicleType(trip.bus)) !== vehicleType) return false;
       return true;
     });
 

@@ -42,16 +42,19 @@ export default function Header() {
                 onClick={() => setShowDropdown((value) => !value)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-900 shadow-sm hover:border-red-200 hover:bg-red-50"
               >
-                <FaUser className="text-red-600" />
+                <UserAvatar user={user} size="sm" />
                 <span className="max-w-[150px] truncate">{user.fullName}</span>
                 <FaChevronDown className="text-xs text-slate-400" />
               </button>
 
               {showDropdown && (
                 <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl">
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <div className="text-sm font-black">{user.fullName}</div>
-                    <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">{user.email}</div>
+                  <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+                    <UserAvatar user={user} />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black">{user.fullName}</div>
+                      <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">{user.email}</div>
+                    </div>
                   </div>
 
                   <DropdownLink to="/profile" onClick={() => setShowDropdown(false)}>
@@ -137,5 +140,32 @@ function DropdownLink({ to, onClick, children }) {
     <Link to={to} onClick={onClick} className="block px-4 py-3 text-sm font-bold hover:bg-slate-50 hover:text-red-600">
       {children}
     </Link>
+  )
+}
+
+function UserAvatar({ user, size = 'md' }) {
+  const initials = String(user?.fullName || user?.email || 'U')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+  const sizeClass = size === 'sm' ? 'h-7 w-7 text-xs' : 'h-10 w-10 text-sm'
+
+  if (user?.avatar) {
+    return (
+      <img
+        src={user.avatar}
+        alt=""
+        className={`${sizeClass} shrink-0 rounded-xl object-cover`}
+      />
+    )
+  }
+
+  return (
+    <span className={`${sizeClass} inline-flex shrink-0 items-center justify-center rounded-xl bg-red-50 font-black text-red-600`}>
+      {initials || <FaUser />}
+    </span>
   )
 }

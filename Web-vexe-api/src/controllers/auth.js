@@ -97,25 +97,40 @@ export const registerCarrier = async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
-    }
-
+    let user = await User.findOne({ where: { email } });
     const existingCarrier = await Carrier.findOne({ where: { email } });
+
     if (existingCarrier) {
-      return res.status(409).json({ error: 'Carrier email already exists' });
+      return res.status(409).json({ error: 'Email da duoc dang ky nha xe' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      email,
-      password: hashedPassword,
-      fullName,
-      phone,
-      role: 'carrier',
-      isVerified: false,
-    });
+    if (user) {
+      if (user.role === 'carrier') {
+        return res.status(409).json({ error: 'Email da duoc dang ky nha xe' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(409).json({ error: 'Email da ton tai. Vui long dung email khac hoac nhap dung mat khau cua tai khoan hien co.' });
+      }
+
+      await user.update({
+        fullName,
+        phone,
+        role: 'carrier',
+        isVerified: false,
+      });
+    } else {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user = await User.create({
+        email,
+        password: hashedPassword,
+        fullName,
+        phone,
+        role: 'carrier',
+        isVerified: false,
+      });
+    }
 
     const carrier = await Carrier.create({
       name: carrierName,
@@ -276,8 +291,8 @@ export const updateProfile = async (req, res) => {
       }
       user.email = email;
     }
-    if (phone) user.phone = phone;
-    if (avatar) user.avatar = avatar;
+    if (phone !== undefined) user.phone = phone;
+    if (avatar !== undefined) user.avatar = avatar;
 
     await user.save();
 

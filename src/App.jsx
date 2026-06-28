@@ -21,10 +21,11 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminFinancePage from './pages/AdminFinancePage'
 import SubscriptionPage from './pages/SubscriptionPage'
 import VehicleManagement from './pages/VehicleManagement'
+import AdminRevenue from './pages/AdminRevenue'
 import TripManagement from './pages/TripManagement'
 import CarrierPortal from './pages/CarrierPortal'
 import Checkout from './pages/Checkout'
-import SelectVehicleType from './pages/SelectVehicleType'
+import VnpayReturn from './pages/VnpayReturn'
 import SelectVehicleVariant from './pages/SelectVehicleVariant'
 import SelectSeat from './pages/SelectSeat'
 import PassengerInfo from './pages/PassengerInfo'
@@ -74,7 +75,7 @@ function AppContent() {
       price: t.price,
       qty: 1,
       // selections will be filled at seat-selection flow
-      vehicleType: null,
+      vehicleType: t.vehicleType || 'seating',
       vehicleVariant: null,
       seatType: null,
       selectedSeatLabels: [],
@@ -83,15 +84,8 @@ function AppContent() {
     // For simplicity: if multiple trips selected, start from the first one.
     const first = (trips && trips[0]) || null
     if (first) {
-      const busName = String(first.bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-      const isSleeping = busName.includes('giuong') || busName.includes('sleeper') || busName.includes('nam')
-      const isVip = busName.includes('vip')
-      const isComfort = busName.includes('comfort') || busName.includes('premium') || busName.includes('limousine')
-      const vehicleType = isSleeping ? 'sleeping' : 'seating'
-      const vehicleVariant = isVip ? 'vip' : isComfort ? 'comfort' : 'standard'
-
-      navigate(`/trip/${first.id}/select-seat`, {
-        state: { vehicleType, vehicleVariant },
+      navigate(`/trip/${first.id}/select-vehicle-variant`, {
+        state: { vehicleType: first.vehicleType || 'seating' },
       })
     } else {
       navigate('/checkout')
@@ -128,7 +122,7 @@ function AppContent() {
           />
 
           <Route path="/trip/:tripId" element={<TripDetail />} />
-          <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleType />} />
+          <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleVariant />} />
           <Route path="/trip/:tripId/select-vehicle-variant" element={<SelectVehicleVariant />} />
           <Route path="/trip/:tripId/select-seat" element={<SelectSeat />} />
           <Route path="/trip/:tripId/passenger-info" element={<PassengerInfo />} />
@@ -142,6 +136,7 @@ function AppContent() {
           <Route path="/bookings" element={<MyTickets />} />
           <Route path="/support" element={<CustomerSupport />} />
           <Route path="/subscriptions" element={<SubscriptionPage />} />
+          <Route path="/payment/vnpay-return" element={<VnpayReturn />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/blog" element={<BlogPage />} />
@@ -157,6 +152,7 @@ function AppContent() {
           <Route path="/admin/feedbacks" element={<AdminLayout><AdminFeedbackManagement /></AdminLayout>} />
           <Route path="/admin/chat" element={<AdminLayout><AdminChatManagement /></AdminLayout>} />
           <Route path="/admin/finance" element={<AdminLayout><AdminFinancePage /></AdminLayout>} />
+          <Route path="/admin/revenue" element={<AdminLayout><AdminRevenue /></AdminLayout>} />
           <Route path="/carrier" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/trips" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/bookings" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />

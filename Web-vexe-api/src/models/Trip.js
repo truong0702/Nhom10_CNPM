@@ -34,6 +34,10 @@ const Trip = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    arrivalDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
     duration: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -45,6 +49,11 @@ const Trip = sequelize.define(
     bus: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    vehicleType: {
+      type: DataTypes.ENUM('sleeping', 'seating'),
+      allowNull: false,
+      defaultValue: 'seating',
     },
     seats: {
       type: DataTypes.INTEGER,

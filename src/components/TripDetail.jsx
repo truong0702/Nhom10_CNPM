@@ -41,6 +41,7 @@ export default function TripDetail() {
   }
 
   const seatsAvailable = trip.seatsAvailable ?? trip.seats ?? 0
+  const vehicleType = trip.vehicleType || getVehicleType(trip.bus)
 
   return (
     <Shell>
@@ -91,29 +92,19 @@ export default function TripDetail() {
               <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-semibold text-slate-600 md:grid-cols-2">
                 <div>Nhà xe: {trip.Carrier?.name || 'Chưa rõ'}</div>
                 <div>Thời lượng: {trip.duration || 'Chưa cập nhật'}</div>
-                <div>Loại xe gợi ý: {getVehicleLabel(trip.bus)}</div>
+                <div>Loại xe: {getVehicleLabel(vehicleType)}</div>
                 <div>Mã chuyến: {trip.id}</div>
               </div>
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => {
-                  const busName = String(trip.bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-                  const isSleeping = busName.includes('giuong') || busName.includes('sleeper') || busName.includes('nam')
-                  const isVip = busName.includes('vip')
-                  const isComfort = busName.includes('comfort') || busName.includes('premium') || busName.includes('limousine')
-                  const vehicleType = isSleeping ? 'sleeping' : 'seating'
-                  const vehicleVariant = isVip ? 'vip' : isComfort ? 'comfort' : 'standard'
-
-                  navigate(`/trip/${trip.id}/select-seat`, {
-                    state: { vehicleType, vehicleVariant },
-                  })
-                }}
+              <Link
+                to={`/trip/${trip.id}/select-vehicle-variant`}
+                state={{ vehicleType }}
                 className="inline-flex flex-1 items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-100 hover:bg-red-700"
               >
                 Chọn ghế
-              </button>
+              </Link>
               <Link
                 to={`/?from=${encodeURIComponent(trip.from)}&to=${encodeURIComponent(trip.to)}&date=${trip.date}`}
                 className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
@@ -149,9 +140,15 @@ function Metric({ icon, label, value }) {
   )
 }
 
-function getVehicleLabel(bus = '') {
+function getVehicleType(bus = '') {
   const text = String(bus).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-  if (text.includes('giuong') || text.includes('limousine') || text.includes('sleeper')) return 'Xe giường nằm'
-  if (text.includes('ghe') || text.includes('ngoi') || text.includes('seat')) return 'Xe ghế ngồi'
+  if (text.includes('giuong') || text.includes('limousine') || text.includes('sleeper')) return 'sleeping'
+  if (text.includes('ghe') || text.includes('ngoi') || text.includes('seat')) return 'seating'
+  return 'seating'
+}
+
+function getVehicleLabel(vehicleType = '') {
+  if (vehicleType === 'sleeping') return 'Xe giường nằm'
+  if (vehicleType === 'seating') return 'Xe ghế ngồi'
   return 'Chưa phân loại'
 }

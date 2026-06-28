@@ -1,5 +1,7 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaBus, FaCreditCard, FaTicketAlt, FaUsers } from 'react-icons/fa'
+import adminApi from '../services/adminApi'
 
 const modules = [
   {
@@ -33,6 +35,27 @@ const modules = [
 ]
 
 export default function AdminDashboard() {
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadRevenue = async () => {
+      try {
+        setLoading(true)
+        const response = await adminApi.getBookings()
+        setBookings(response.bookings || [])
+      } catch {
+        setBookings([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadRevenue()
+  }, [])
+
+  const revenue = useMemo(() => buildRevenueStats(bookings), [bookings])
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -41,7 +64,7 @@ export default function AdminDashboard() {
             <div className="text-sm font-black uppercase tracking-wide text-red-600">Dashboard</div>
             <h1 className="mt-2 text-3xl font-black text-slate-950">Tổng quan quản trị</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-500">
-              Đây là khu vực riêng cho admin để theo dõi vé, thanh toán, người dùng và nhà xe.
+              Theo dõi vé, thanh toán, người dùng, nhà xe và doanh thu hệ thống.
             </p>
           </div>
           <Link
@@ -51,6 +74,13 @@ export default function AdminDashboard() {
             Xem trang khách hàng
           </Link>
         </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Vé đã thanh toán" value={revenue.paidCount} loading={loading} />
+        <StatCard label="Doanh thu gộp" value={formatCurrency(revenue.grossRevenue)} loading={loading} />
+        <StatCard label="Chiết khấu hệ thống" value={formatCurrency(revenue.commission)} loading={loading} />
+        <StatCard label="Nhà xe nhận" value={formatCurrency(revenue.carrierRevenue)} loading={loading} />
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -90,4 +120,42 @@ export default function AdminDashboard() {
       </section>
     </div>
   )
+}
+
+function StatCard({ label, value, loading }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="text-sm font-black uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-3 text-3xl font-black text-slate-950">{loading ? '-' : value}</div>
+    </div>
+  )
+}
+
+function buildRevenueStats(bookings) {
+  const paidBookings = bookings.filter((booking) => booking.paymentStatus === 'paid')
+  const grossRevenue = paidBookings.reduce((sum, booking) => sum + Number(booking.total || 0), 0)
+  const commission = paidBookings.reduce((sum, booking) => sum + getCommissionAmount(booking), 0)
+  const carrierRevenue = paidBookings.reduce((sum, booking) => sum + getCarrierRevenue(booking), 0)
+  return {
+    paidCount: paidBookings.length,
+    grossRevenue,
+    commission,
+    carrierRevenue,
+  }
+}
+
+function getCommissionAmount(booking) {
+  if (booking.paymentStatus !== 'paid') return 0
+  const total = Number(booking.total || 0)
+  return Number(booking.commissionAmount || Math.round(total * 0.1))
+}
+
+function getCarrierRevenue(booking) {
+  if (booking.paymentStatus !== 'paid') return 0
+  const total = Number(booking.total || 0)
+  return Number(booking.carrierRevenue || Math.max(total - getCommissionAmount(booking), 0))
+}
+
+function formatCurrency(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }

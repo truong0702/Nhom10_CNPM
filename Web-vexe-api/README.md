@@ -105,7 +105,22 @@ DB_PASSWORD=postgres
 JWT_SECRET=your_secret_key
 JWT_EXPIRE=7d
 FRONTEND_URL=http://localhost:5173
+EMAIL_FROM="VeXe <noreply@vexe.local>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+VNPAY_TMN_CODE=your_vnpay_tmn_code
+VNPAY_HASH_SECRET=your_vnpay_hash_secret
+VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_RETURN_URL=http://localhost:5173/payment/vnpay-return
+VNPAY_IPN_URL=http://localhost:5000/api/payments/vnpay/ipn
 ```
+
+Booking confirmation emails are sent after a booking is created. If SMTP variables are
+not configured, the backend prints an email preview to the console instead of failing
+the booking request.
 
 ## Database Setup
 
