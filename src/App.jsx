@@ -161,6 +161,7 @@ function AppContent() {
           <Route path="/carrier/trips" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/bookings" element={<CarrierLayout><CarrierPortal /></CarrierLayout>} />
           <Route path="/carrier/vehicles" element={<CarrierLayout><VehicleManagement /></CarrierLayout>} />
+          <Route path="/carrier/subscriptions" element={<CarrierLayout><SubscriptionPage /></CarrierLayout>} />
         </Routes>
       </main>
       {!isAdminRoute && !isCarrierRoute && <Footer />}

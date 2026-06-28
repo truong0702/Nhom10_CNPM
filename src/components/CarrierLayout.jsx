@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { FaBus, FaHome, FaRoute, FaSignOutAlt, FaTicketAlt } from 'react-icons/fa'
+import { FaBus, FaHome, FaRoute, FaSignOutAlt, FaTicketAlt, FaCreditCard } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
   { to: '/carrier/trips', label: 'Chuyến xe', icon: FaRoute },
   { to: '/carrier/bookings', label: 'Vé đã đặt', icon: FaTicketAlt },
   { to: '/carrier/vehicles', label: 'Quản lý xe', icon: FaBus },
+  { to: '/carrier/subscriptions', label: 'Gói dịch vụ', icon: FaCreditCard },
 ]
 
 export default function CarrierLayout({ children }) {

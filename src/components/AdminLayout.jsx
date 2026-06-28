@@ -11,6 +11,7 @@ import {
   FaSignOutAlt,
   FaTicketAlt,
   FaUsers,
+  FaCoins,
 } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 
@@ -23,6 +24,7 @@ const adminLinks = [
   { to: '/admin/carriers', label: 'Nhà xe', icon: FaBus },
   { to: '/admin/feedbacks', label: 'Góp ý & khiếu nại', icon: FaCommentAlt },
   { to: '/admin/chat', label: 'Chat trực tuyến', icon: FaComments },
+  { to: '/admin/finance', label: 'Quản lý tài chính', icon: FaCoins },
 ]
 
 export default function AdminLayout({ children }) {
