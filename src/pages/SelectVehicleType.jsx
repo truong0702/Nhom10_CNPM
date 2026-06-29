@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../services/api'
 
 export default function SelectVehicleType() {
   const { tripId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
 
 
-  const [vehicleType, setVehicleType] = useState('') // 'sleeping' | 'seating'
+  const [vehicleType, setVehicleType] = useState(location.state?.vehicleType || '') // 'sleeping' | 'seating'
   const [trip, setTrip] = useState(null)
   const [error, setError] = useState(null)
   useEffect(() => {
@@ -32,7 +33,12 @@ export default function SelectVehicleType() {
 
   const onContinue = () => {
     if (!vehicleType) return
-    navigate(`/trip/${tripId}/select-vehicle-variant`, { state: { vehicleType } })
+    navigate(`/trip/${tripId}/select-vehicle-variant`, {
+      state: {
+        vehicleType,
+        qty: Math.max(Number(location.state?.qty || 1), 1),
+      },
+    })
   }
 
   if (error) {

@@ -6,7 +6,7 @@ import {
   getAdminConversations,
   getAdminChatMessages,
   sendAdminChatMessage,
-} from '../controllers/chatController.js';
+} from '../controllers/chatSupportController.js';
 
 const router = express.Router();
 

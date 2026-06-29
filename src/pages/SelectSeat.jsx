@@ -56,22 +56,25 @@ export default function SelectSeat() {
     }
   }, [tripId])
 
-  const qty = 1
+  const qty = Math.max(Number(location.state?.qty || 1), 1)
   const selectionKey = 'vexere_selection'
 
   const lockedLabels = useMemo(() => {
+    return occupiedSeatLabels.map((label) => Number(label))
+  }, [occupiedSeatLabels])
+
+  const [selectedSeatLabels, setSelectedSeatLabels] = useState([])
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(selectionKey)
       const map = raw ? JSON.parse(raw) : {}
       const labels = map[String(tripId)]?.selectedSeatLabels
-      const localLabels = Array.isArray(labels) ? labels : []
-      return Array.from(new Set([...localLabels, ...occupiedSeatLabels].map((label) => Number(label))))
+      setSelectedSeatLabels(Array.isArray(labels) ? labels.map(Number).slice(0, qty) : [])
     } catch {
-      return occupiedSeatLabels.map((label) => Number(label))
+      setSelectedSeatLabels([])
     }
-  }, [occupiedSeatLabels, selectionKey, tripId])
-
-  const [selectedSeatLabels, setSelectedSeatLabels] = useState([])
+  }, [qty, selectionKey, tripId])
 
   const seatKind = vehicleType === 'sleeping' ? 'nằm' : 'ngồi'
 

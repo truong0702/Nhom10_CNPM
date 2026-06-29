@@ -341,12 +341,6 @@ export default function TripManagement() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">Äang táº£i...</td>
-                </tr>
-              ) : filteredTrips.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center font-bold text-slate-500">ChÆ°a cÃ³ chuyáº¿n xe phÃ¹ há»£p</td>
-
                   <td colSpan={7} className="px-5 py-10 text-center font-bold text-slate-500">Đang tải...</td>
                 </tr>
               ) : filteredTrips.length === 0 ? (

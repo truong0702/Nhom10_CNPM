@@ -55,6 +55,7 @@ export default function SelectVehicleVariant() {
       state: {
         vehicleType,
         vehicleVariant,
+        qty: Math.max(Number(location.state?.qty || 1), 1),
       },
     })
   }

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-ro
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
+import FloatingChatWidget from './components/FloatingChatWidget'
 import AdminLayout from './components/AdminLayout'
 import TripDetail from './components/TripDetail'
 import CarrierLayout from './components/CarrierLayout'
@@ -26,6 +27,7 @@ import TripManagement from './pages/TripManagement'
 import CarrierPortal from './pages/CarrierPortal'
 import Checkout from './pages/Checkout'
 import VnpayReturn from './pages/VnpayReturn'
+import SelectVehicleType from './pages/SelectVehicleType'
 import SelectVehicleVariant from './pages/SelectVehicleVariant'
 import SelectSeat from './pages/SelectSeat'
 import PassengerInfo from './pages/PassengerInfo'
@@ -50,12 +52,32 @@ function AppContent() {
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isCarrierRoute = location.pathname.startsWith('/carrier')
 
-  const [cartItems, setCartItems] = useState([])
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vexere_cart')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const total = useMemo(() => {
     return cartItems.reduce((sum, it) => sum + it.price * it.qty, 0)
   }, [cartItems])
 
-  const clearCart = () => setCartItems([])
+  useEffect(() => {
+    if (cartItems.length) {
+      localStorage.setItem('vexere_cart', JSON.stringify(cartItems))
+    } else {
+      localStorage.removeItem('vexere_cart')
+    }
+  }, [cartItems])
+
+  const clearCart = () => {
+    setCartItems([])
+    localStorage.removeItem('vexere_cart')
+    localStorage.removeItem('vexere_selection')
+    localStorage.removeItem('vexere_passenger')
+  }
 
   useEffect(() => {
     if (!loading && user?.role === 'admin' && !isAdminRoute && ['/', '/login'].includes(location.pathname)) {
@@ -73,7 +95,7 @@ function AppContent() {
       id: t.id,
       title: `${t.bus} (${t.from}→${t.to})`,
       price: t.price,
-      qty: 1,
+      qty: Number(t.requestedPassengers || t.passengers || t.qty || 1),
       // selections will be filled at seat-selection flow
       vehicleType: t.vehicleType || 'seating',
       vehicleVariant: null,
@@ -84,8 +106,8 @@ function AppContent() {
     // For simplicity: if multiple trips selected, start from the first one.
     const first = (trips && trips[0]) || null
     if (first) {
-      navigate(`/trip/${first.id}/select-vehicle-variant`, {
-        state: { vehicleType: first.vehicleType || 'seating' },
+      navigate(`/trip/${first.id}/select-vehicle-type`, {
+        state: { qty: Number(first.requestedPassengers || first.passengers || first.qty || 1) },
       })
     } else {
       navigate('/checkout')
@@ -122,7 +144,7 @@ function AppContent() {
           />
 
           <Route path="/trip/:tripId" element={<TripDetail />} />
-          <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleVariant />} />
+          <Route path="/trip/:tripId/select-vehicle-type" element={<SelectVehicleType />} />
           <Route path="/trip/:tripId/select-vehicle-variant" element={<SelectVehicleVariant />} />
           <Route path="/trip/:tripId/select-seat" element={<SelectSeat />} />
           <Route path="/trip/:tripId/passenger-info" element={<PassengerInfo />} />
@@ -161,6 +183,7 @@ function AppContent() {
         </Routes>
       </main>
       {!isAdminRoute && !isCarrierRoute && <Footer />}
+      {!isAdminRoute && !isCarrierRoute && <FloatingChatWidget />}
     </>
   )
 }

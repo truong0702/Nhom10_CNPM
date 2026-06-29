@@ -25,6 +25,11 @@ const ChatMessage = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    isAutoReply: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     timestamps: true,

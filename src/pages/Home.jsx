@@ -49,7 +49,8 @@ export default function Home({ onProceedToCheckout }) {
         timeOfDay: searchData.timeOfDay,
         vehicleType: searchData.vehicleType,
       })
-      setTrips(results)
+      const requestedPassengers = Math.max(Number(searchData.passengers || 1), 1)
+      setTrips((results || []).map((trip) => ({ ...trip, requestedPassengers })))
       setSearched(true)
     } catch (err) {
       setError(err.message || 'Không thể tìm chuyến xe. Vui lòng thử lại.')

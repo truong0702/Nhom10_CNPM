@@ -100,7 +100,9 @@ export default function AdminChatManagement() {
     }
   }
 
-  const selectedUser = conversations.find(c => c.userId === selectedUserId)?.user
+  const selectedConversation = conversations.find(c => c.userId === selectedUserId)
+  const selectedUser = selectedConversation?.user
+  const pendingTotal = conversations.reduce((sum, conv) => sum + Number(conv.pendingCount || 0), 0)
 
   const formatTime = (dateStr) => {
     if (!dateStr) return ''
@@ -122,6 +124,9 @@ export default function AdminChatManagement() {
             <FaComments className="text-red-500" />
             Khách hàng trực tuyến
           </h2>
+          <div className="ml-8 text-xs font-bold text-slate-500">
+            {pendingTotal > 0 ? `${pendingTotal} yêu cầu đang chờ nhân viên` : 'Không có yêu cầu mới'}
+          </div>
           <button
             onClick={() => loadConversations()}
             disabled={isRefreshing}
@@ -159,6 +164,11 @@ export default function AdminChatManagement() {
                     <div className="text-sm font-black truncate text-slate-900">
                       {conv.user?.fullName || 'Khách hàng'}
                     </div>
+                    {conv.pendingSupport && (
+                      <div className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-700">
+                        Chờ hỗ trợ
+                      </div>
+                    )}
                     <div className="text-xs text-slate-400 truncate mt-0.5 font-normal">
                       {conv.lastMessage}
                     </div>

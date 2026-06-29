@@ -346,6 +346,10 @@ function ChatTab() {
     }
   }, [user])
 
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
 
   const sendMessage = async () => {
     if (!input.trim() || !user) return
@@ -353,8 +357,10 @@ function ChatTab() {
     setInput('')
     try {
       const res = await apiClient.post('/chat', { content: text })
-      if (res.chatMessage) {
-        setMessages((prev) => [...prev, res.chatMessage])
+      if (Array.isArray(res.messages) && res.messages.length) {
+        setMessages((prev) => [...prev, ...res.messages])
+      } else if (res.chatMessage) {
+        setMessages((prev) => [...prev, res.chatMessage, res.autoReply].filter(Boolean))
       } else {
         loadMessages(true)
       }
@@ -407,6 +413,11 @@ function ChatTab() {
                     }`}
                 >
                   <p className="font-semibold leading-relaxed">{msg.content}</p>
+                  {msg.isAutoReply && (
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-500">
+                      Tự động phản hồi
+                    </p>
+                  )}
                   <p className={`mt-1 text-[10px] text-right font-normal ${isUser ? 'text-red-200' : 'text-gray-400'}`}>
                     {fmtTime(msg.createdAt)}
                   </p>

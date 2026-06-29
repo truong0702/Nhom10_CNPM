@@ -1,5 +1,6 @@
 import { Booking, Trip, User, Wallet, Payment } from '../models/index.js';
 import { sendBookingConfirmation } from '../utils/mailer.js';
+import { expirePendingBookings } from '../services/bookingExpiry.js';
 
 const CARRIER_COMMISSION_RATE = 0.1;
 
@@ -15,6 +16,38 @@ const getSeatCount = (items) => {
     const selectedSeats = item.selectedSeatLabels || item.selectedSeats || [];
     return sum + Number(item.seats || selectedSeats.length || item.qty || 1);
   }, 0);
+};
+
+const getNumericSeatLabels = (items) => (Array.isArray(items) ? items : [])
+  .flatMap((item) => item.selectedSeatLabels || item.selectedSeats || [])
+  .map((label) => Number(label))
+  .filter((label) => Number.isFinite(label));
+
+const hasSameSeatSet = (left, right) => {
+  if (!left.length || left.length !== right.length) return false;
+  const rightSet = new Set(right.map((label) => Number(label)));
+  return left.every((label) => rightSet.has(Number(label)));
+};
+
+const findReusablePendingBooking = async ({ userId, tripId, requestedSeatLabels, totalAmount }) => {
+  if (!requestedSeatLabels.length) return null;
+
+  const pendingBookings = await Booking.findAll({
+    where: {
+      userId,
+      tripId,
+      cancelStatus: 'active',
+      paymentStatus: 'pending',
+    },
+    order: [['createdAt', 'DESC']],
+  });
+
+  return pendingBookings.find((booking) => {
+    const bookingSeatLabels = getNumericSeatLabels(booking.items);
+    const sameSeats = hasSameSeatSet(requestedSeatLabels, bookingSeatLabels);
+    const sameTotal = Number(booking.total || 0) === Number(totalAmount || 0);
+    return sameSeats && sameTotal;
+  }) || null;
 };
 
 const getPaymentMethodLabel = (paymentMethod) => {
@@ -83,6 +116,8 @@ export const createBooking = async (req, res) => {
     const { tripId, items, total, paymentMethod } = req.body;
     const userId = req.user.id;
 
+    await expirePendingBookings({ tripId });
+
     // Validate trip exists
     const trip = await Trip.findByPk(tripId);
     if (!trip) return res.status(404).json({ error: 'Trip not found' });
@@ -97,6 +132,39 @@ export const createBooking = async (req, res) => {
       totalSeats = 1;
     }
 
+    const bookingItems = Array.isArray(items) ? items : [
+      {
+        description: `${trip.from} -> ${trip.to}`,
+        seats: totalSeats,
+        price: trip.price,
+        total: total || trip.price * totalSeats,
+      }
+    ];
+
+    const totalAmount = Number(total) || Number(trip.price * totalSeats);
+    const requestedSeatLabels = getNumericSeatLabels(bookingItems);
+
+    const reusableBooking = await findReusablePendingBooking({
+      userId,
+      tripId,
+      requestedSeatLabels,
+      totalAmount,
+    });
+
+    if (reusableBooking) {
+      return res.status(200).json({
+        message: 'Reusing existing pending booking',
+        booking: {
+          ...reusableBooking.toJSON(),
+          ticketCode: getTicketCode(reusableBooking.id),
+        },
+        trip: {
+          id: trip.id,
+          seatsRemaining: trip.seatsAvailable,
+        },
+      });
+    }
+
     // Validate seats available
     if (trip.seatsAvailable < totalSeats) {
       return res.status(400).json({
@@ -105,11 +173,6 @@ export const createBooking = async (req, res) => {
         requested: totalSeats,
       });
     }
-
-    const requestedSeatLabels = (Array.isArray(items) ? items : [])
-      .flatMap((item) => item.selectedSeatLabels || item.selectedSeats || [])
-      .map((label) => Number(label))
-      .filter((label) => Number.isFinite(label));
 
     if (requestedSeatLabels.length) {
       const existingBookings = await Booking.findAll({
@@ -131,19 +194,6 @@ export const createBooking = async (req, res) => {
         });
       }
     }
-
-    // Prepare items
-    const bookingItems = Array.isArray(items) ? items : [
-      {
-        description: `${trip.from} -> ${trip.to}`,
-        seats: totalSeats,
-        price: trip.price,
-        total: total || trip.price * totalSeats,
-      }
-    ];
-
-    // Convert total to number
-    const totalAmount = Number(total) || Number(trip.price * totalSeats);
 
     // Create booking
     const booking = await Booking.create({
@@ -436,6 +486,7 @@ export const cancelBooking = async (req, res) => {
 export const getBookings = async (req, res) => {
   try {
     const userId = req.user.id;
+    await expirePendingBookings({ userId });
     const bookings = await Booking.findAll({
       where: { userId },
       include: [
@@ -482,6 +533,7 @@ export const getBooking = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    await expirePendingBookings({ userId });
 
     const booking = await Booking.findByPk(id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });

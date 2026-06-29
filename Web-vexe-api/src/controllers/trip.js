@@ -1,9 +1,11 @@
 import Trip from '../models/Trip.js';
 import Carrier from '../models/Carrier.js';
 import Booking from '../models/Booking.js';
+import { expirePendingBookings } from '../services/bookingExpiry.js';
 
 export const getTrips = async (req, res) => {
   try {
+    await expirePendingBookings();
     const { from, to, date, timeOfDay, vehicleType, limit = 10, offset = 0 } = req.query;
 
     // Build where clause
@@ -62,6 +64,7 @@ const getVehicleType = (bus = '') => {
 export const getTripById = async (req, res) => {
   try {
     const { id } = req.params;
+    await expirePendingBookings({ tripId: id });
 
     const trip = await Trip.findByPk(id, {
       include: [{ model: Carrier, attributes: ['id', 'name', 'status', 'approved'] }],
@@ -90,6 +93,7 @@ export const getTripById = async (req, res) => {
 export const getSeats = async (req, res) => {
   try {
     const { id: tripId } = req.params;
+    await expirePendingBookings({ tripId });
 
     const trip = await Trip.findByPk(tripId);
 

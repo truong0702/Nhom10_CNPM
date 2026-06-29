@@ -99,8 +99,8 @@ export default function TripDetail() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
-                to={`/trip/${trip.id}/select-vehicle-variant`}
-                state={{ vehicleType }}
+                to={`/trip/${trip.id}/select-vehicle-type`}
+                state={{ vehicleType, qty: 1 }}
                 className="inline-flex flex-1 items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-100 hover:bg-red-700"
               >
                 Chọn ghế

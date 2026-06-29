@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Payment, Booking, User, Trip } from '../models/index.js';
 import { sendBookingConfirmation } from '../utils/mailer.js';
+import { expirePendingBookings, isBookingExpired } from '../services/bookingExpiry.js';
 
 const CARRIER_COMMISSION_RATE = 0.1;
 
@@ -16,6 +17,32 @@ const getSeatCount = (items) => {
     const selectedSeats = item.selectedSeatLabels || item.selectedSeats || [];
     return sum + Number(item.seats || selectedSeats.length || item.qty || 1);
   }, 0);
+};
+
+const releaseBookingSeats = async (booking, reason = 'Payment failed') => {
+  if (!booking || booking.cancelStatus !== 'active') return;
+  const trip = await Trip.findByPk(booking.tripId);
+  const seatsToRelease = getSeatCount(booking.items);
+
+  booking.cancelStatus = 'canceled';
+  booking.canceledAt = new Date();
+  booking.cancelReason = reason;
+  if (!booking.history) booking.history = [];
+  booking.history.push({
+    event: 'BOOKING_SEATS_RELEASED',
+    reason,
+    releasedSeats: seatsToRelease,
+    timestamp: new Date(),
+  });
+  await booking.save();
+
+  if (trip) {
+    trip.seatsAvailable = Math.min(
+      Number(trip.seats || 0),
+      Number(trip.seatsAvailable || 0) + seatsToRelease
+    );
+    await trip.save();
+  }
 };
 
 const getPaymentMethodLabel = (paymentMethod) => {
@@ -185,6 +212,7 @@ const processVnpayResult = async (query = {}) => {
 
   booking.paymentStatus = 'failed';
   await booking.save();
+  await releaseBookingSeats(booking, `VNPay failed with code ${responseCode}`);
 
   return { ok: false, code: responseCode || '99', message: 'Payment failed', payment, booking };
 };
@@ -227,6 +255,7 @@ export const createBankTransferPayment = async (req, res) => {
       bankTransferNote,
     } = req.body;
     const userId = req.user.id;
+    await expirePendingBookings({ userId });
 
     // Validate booking exists
     const booking = await Booking.findByPk(bookingId);
@@ -237,6 +266,9 @@ export const createBankTransferPayment = async (req, res) => {
     // Validate user owns booking
     if (booking.userId !== userId) {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (booking.cancelStatus !== 'active' || isBookingExpired(booking)) {
+      return res.status(400).json({ error: 'Booking hold expired. Please select seats again.' });
     }
 
     // Validate amount
@@ -326,6 +358,7 @@ export const createVnpayPayment = async (req, res) => {
   try {
     const { bookingId, amount } = req.body;
     const userId = req.user.id;
+    await expirePendingBookings({ userId });
 
     const tmnCode = process.env.VNPAY_TMN_CODE;
     const hashSecret = process.env.VNPAY_HASH_SECRET;
@@ -339,6 +372,9 @@ export const createVnpayPayment = async (req, res) => {
     const booking = await Booking.findByPk(bookingId);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
     if (booking.userId !== userId) return res.status(403).json({ error: 'Unauthorized' });
+    if (booking.cancelStatus !== 'active' || isBookingExpired(booking)) {
+      return res.status(400).json({ error: 'Booking hold expired. Please select seats again.' });
+    }
 
     const amountNum = Number(amount);
     const bookingTotalNum = Number(booking.total);
@@ -616,6 +652,7 @@ export const rejectBankTransfer = async (req, res) => {
     if (booking) {
       booking.paymentStatus = 'failed';
       await booking.save();
+      await releaseBookingSeats(booking, reason || 'Payment rejected by admin');
     }
 
     return res.status(200).json({

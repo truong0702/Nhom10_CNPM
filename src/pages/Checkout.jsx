@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { createBookingFromCart, updateBookingPaymentStatus } from '../utils/bookingsStorage'
 import paymentApi from '../services/paymentApi'
 
 export default function Checkout({ cartItems, total, onUpdateQty, onClear }) {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer')
   const [payStatus, setPayStatus] = useState('idle') // idle | processing | success | failed
@@ -111,11 +113,20 @@ export default function Checkout({ cartItems, total, onUpdateQty, onClear }) {
       setBookingData(booking)
     } catch (err) {
       setPayStatus('failed')
-      setErrorMsg(err?.message || 'Không thể tạo booking. Vui lòng thử lại sau.')
+      const selectedSeatsUnavailable = err?.message === 'Some selected seats are no longer available'
+      setErrorMsg(selectedSeatsUnavailable
+        ? 'Gh\u1ebf b\u1ea1n ch\u1ecdn \u0111\u00e3 c\u00f3 ng\u01b0\u1eddi gi\u1eef. Vui l\u00f2ng ch\u1ecdn l\u1ea1i gh\u1ebf kh\u00e1c.'
+        : err?.message || 'Kh\u00f4ng th\u1ec3 t\u1ea1o booking. Vui l\u00f2ng th\u1eed l\u1ea1i sau.')
+      if (selectedSeatsUnavailable) {
+        const firstTripId = enrichedItems[0]?.tripId || enrichedItems[0]?.id
+        if (firstTripId) {
+          localStorage.removeItem('vexere_selection')
+          setTimeout(() => navigate('/trip/' + firstTripId + '/select-seat'), 1200)
+        }
+      }
       return
     }
 
-    // Nếu là bank transfer, tạo payment record
     if (paymentMethod === 'vnpay') {
       try {
         const response = await paymentApi.createVnpayPayment(booking.id, Number(payableTotal))
