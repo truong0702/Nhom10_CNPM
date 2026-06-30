@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import PasswordField from '../components/PasswordField'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -219,8 +220,7 @@ export default function UserManagement() {
 
                   <div className="space-y-2">
                     <label className="block text-sm font-black text-gray-700">Password mới (optional)</label>
-                    <input
-                      type="password"
+                    <PasswordField
                       value={form.password}
                       onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-500 font-semibold"

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FaBus, FaEnvelope, FaLock, FaStore, FaUser } from 'react-icons/fa'
+import { FaBus, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaStore, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loginAs, setLoginAs] = useState('user')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -91,12 +92,21 @@ export default function Login() {
                 <div className="relative">
                   <FaLock className="absolute left-4 top-3.5 text-lg text-red-500" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border-2 border-gray-200 py-3 pl-12 pr-4 font-semibold transition-all focus:border-red-500 focus:bg-red-50 focus:outline-none"
+                    className="w-full rounded-xl border-2 border-gray-200 py-3 pl-12 pr-12 font-semibold transition-all focus:border-red-500 focus:bg-red-50 focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-red-500"
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
                 </div>
               </div>
 

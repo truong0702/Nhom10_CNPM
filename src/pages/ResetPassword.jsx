@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { FaKey, FaLock, FaBus } from 'react-icons/fa'
+import { FaKey, FaLock, FaBus, FaEye, FaEyeSlash } from 'react-icons/fa'
 
 export default function ResetPassword() {
   const [token, setToken] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -84,12 +86,21 @@ export default function ResetPassword() {
                 <div className="relative">
                   <FaLock className="absolute left-4 top-3.5 text-red-500 text-lg" />
                   <input
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-500 focus:bg-red-50 transition-all font-semibold"
+                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-500 focus:bg-red-50 transition-all font-semibold"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((current) => !current)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-red-500"
+                    aria-label={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showNewPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
                 </div>
               </div>
 
@@ -98,12 +109,21 @@ export default function ResetPassword() {
                 <div className="relative">
                   <FaLock className="absolute left-4 top-3.5 text-red-500 text-lg" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-500 focus:bg-red-50 transition-all font-semibold"
+                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-500 focus:bg-red-50 transition-all font-semibold"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((current) => !current)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-red-500"
+                    aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
                 </div>
               </div>
 

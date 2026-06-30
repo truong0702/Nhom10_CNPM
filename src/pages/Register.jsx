@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FaBus, FaEnvelope, FaLock, FaMapMarkerAlt, FaPhone, FaStore, FaUser } from 'react-icons/fa'
+import { FaBus, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaMapMarkerAlt, FaPhone, FaStore, FaUser } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 
 export default function Register() {
@@ -218,19 +218,33 @@ function TextField({
   placeholder,
   maxLength,
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const isPassword = type === 'password'
+
   return (
     <div>
       <label className="mb-2 block text-sm font-black text-gray-700">{label}</label>
       <div className="relative">
         <span className="absolute left-4 top-3.5 text-lg text-red-500">{icon}</span>
         <input
-          type={type}
+          type={isPassword && showPassword ? 'text' : type}
           value={value}
           onChange={onChangeRaw || ((event) => onChange(event.target.value))}
           placeholder={placeholder}
           maxLength={maxLength}
-          className="w-full rounded-xl border-2 border-gray-200 py-3 pl-12 pr-4 font-semibold transition-all focus:border-red-500 focus:bg-red-50 focus:outline-none"
+          className={`w-full rounded-xl border-2 border-gray-200 py-3 pl-12 ${isPassword ? 'pr-12' : 'pr-4'} font-semibold transition-all focus:border-red-500 focus:bg-red-50 focus:outline-none`}
         />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-red-500"
+            aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          >
+            {showPassword ? <FaEyeSlash /> : <FaEye />}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -13,6 +13,7 @@ import {
   FaUser,
 } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import PasswordField from '../components/PasswordField'
 
 export default function Profile() {
   const navigate = useNavigate()
@@ -325,8 +326,7 @@ export default function Profile() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Field label="Mật khẩu hiện tại">
-                <input
-                  type="password"
+                <PasswordField
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
                   className={inputClass}
@@ -335,8 +335,7 @@ export default function Profile() {
               </Field>
 
               <Field label="Mật khẩu mới">
-                <input
-                  type="password"
+                <PasswordField
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
                   className={inputClass}
@@ -345,8 +344,7 @@ export default function Profile() {
               </Field>
 
               <Field label="Xác nhận mật khẩu">
-                <input
-                  type="password"
+                <PasswordField
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   className={inputClass}

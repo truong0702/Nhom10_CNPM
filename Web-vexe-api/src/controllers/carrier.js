@@ -62,7 +62,7 @@ const withCarrierRevenue = (booking) => {
   return result;
 };
 
-const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
+export const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
   const seats = payload.seats !== undefined ? Number(payload.seats) : existingTrip?.seats;
   const seatsAvailable =
     payload.seatsAvailable !== undefined
@@ -92,7 +92,7 @@ const normalizeTripPayload = (payload = {}, carrierId, existingTrip = null) => {
   };
 };
 
-const validateTripPayload = (payload) => {
+export const validateTripPayload = (payload) => {
   const required = ['carrierId', 'from', 'to', 'departure', 'arrival', 'date', 'arrivalDate', 'bus', 'vehicleType'];
   for (const field of required) {
     if (!payload[field]) return `${field} is required`;
